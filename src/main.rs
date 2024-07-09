@@ -1,5 +1,6 @@
 use crate::logger::init_log;
 use logger::tracing_init;
+use request::GLOBAL_RUNTIME;
 use serde::{Deserialize, Serialize};
 mod cmd;
 mod commons;
@@ -19,6 +20,7 @@ struct Test {
 fn main() {
     // init_log();
     tracing_init();
+    GLOBAL_RUNTIME.block_on(async {});
     // let db = GLOBAL_ROCKSDB.clone();
     // let cf = db.cf_handle(CF_TASK_STATUS).unwrap();
 

@@ -10,7 +10,7 @@ use url::Url;
 pub const CF_SERVERS: &'static str = "cf_servers";
 
 pub static GLOBAL_ROCKSDB: Lazy<Arc<DBWithThreadMode<MultiThreaded>>> = Lazy::new(|| {
-    let rocksdb = match init_rocksdb("oss_pipe_rocksdb") {
+    let rocksdb = match init_rocksdb("files_pipe_cli_rocksdb") {
         Ok(db) => db,
         Err(err) => panic!("{}", err),
     };
@@ -85,7 +85,7 @@ pub fn server_is_saved(server: &str) -> Result<bool> {
     Ok(saved)
 }
 
-pub fn get_server_url_str_from_cf(server_id: &str) -> Result<String> {
+pub fn get_server_url_from_cf(server_id: &str) -> Result<String> {
     let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
         Some(cf) => cf,
         None => return Err(anyhow!("column family not exist")),

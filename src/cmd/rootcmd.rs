@@ -10,9 +10,9 @@ use crate::configure::{generate_default_config, set_config_file_path};
 use crate::configure::{get_config_file_path, get_current_config_yml, set_config};
 use crate::interact;
 use crate::interact::INTERACT_STATUS;
-use crate::request::GLOBAL_CURRENT_SERVER;
+use crate::request::{list_all_tasks, test_reqwest, GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME};
 use crate::resources::{
-    get_server_url_str_from_cf, list_servers_from_cf, remove_server_from_cf, save_server_to_cf,
+    get_server_url_from_cf, list_servers_from_cf, remove_server_from_cf, save_server_to_cf,
 };
 use clap::{Arg, ArgAction, ArgMatches, Command as Clap_Command};
 use lazy_static::lazy_static;
@@ -169,7 +169,7 @@ fn cmd_match(matches: &ArgMatches) {
 
         if let Some(set) = server.subcommand_matches("set") {
             if let Some(id) = set.get_one::<String>("server_id") {
-                let server = match get_server_url_str_from_cf(id) {
+                let server = match get_server_url_from_cf(id) {
                     Ok(s) => s,
                     Err(e) => {
                         eprintln!("{:?}", e);
@@ -218,6 +218,12 @@ fn cmd_match(matches: &ArgMatches) {
     }
 
     if let Some(task) = matches.subcommand_matches("task") {
+        if let Some(_) = task.subcommand_matches("list_all") {
+            GLOBAL_RUNTIME.spawn(async move {
+                println!("{:#?}", list_all_tasks().await);
+            });
+        }
+
         if let Some(exec) = task.subcommand_matches("exec") {
             if let Some(id) = exec.get_one::<String>("taskid") {
                 println!("task id:{}", id);
@@ -227,6 +233,7 @@ fn cmd_match(matches: &ArgMatches) {
         if let Some(analyze) = task.subcommand_matches("analyze") {
             if let Some(id) = analyze.get_one::<String>("taskid") {
                 println!("task id:{}", id);
+                test_reqwest()
             }
         }
     }

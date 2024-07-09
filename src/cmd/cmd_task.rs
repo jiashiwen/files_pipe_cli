@@ -4,6 +4,7 @@ pub fn new_task_cmd() -> Command {
     clap::Command::new("task")
         .subcommand(task_exec())
         .subcommand(task_analyze_source())
+        .subcommand(task_list_all())
 }
 
 fn task_exec() -> Command {
@@ -24,4 +25,8 @@ fn task_analyze_source() -> Command {
             .required(true)
             .index(1)
             .help("analyze source objects destributed")])
+}
+
+fn task_list_all() -> Command {
+    clap::Command::new("list_all").about("list_all")
 }
