@@ -1,6 +1,10 @@
 mod global_http_client;
 mod modules;
+mod req;
 mod req_task;
+mod req_template;
 pub use global_http_client::*;
 pub use modules::*;
+pub use req::*;
 pub use req_task::*;
+pub use req_template::*;

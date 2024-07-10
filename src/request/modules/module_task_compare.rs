@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::request::modules::moduile_task::TaskDefaultParameters;
+use crate::request::modules::module_task::TaskDefaultParameters;
 
-use super::{moduile_task::CompareTaskAttributes, module_storage::ObjectStorage};
+use super::module_storage::ObjectStorage;
+use super::module_task::CompareTaskAttributes;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]

@@ -6,12 +6,44 @@ use crate::commons::{byte_size_str_to_usize, byte_size_usize_to_str};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use snowflake::SnowflakeIdGenerator;
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+pub enum TaskType {
+    Transfer,
+    TruncateBucket,
+    Compare,
+}
+
+impl TaskType {
+    pub fn to_string(&self) -> String {
+        match self {
+            TaskType::Transfer => "Transfer".to_string(),
+            TaskType::TruncateBucket => "TruncateBucket".to_string(),
+            TaskType::Compare => "Compare".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub enum TransferStage {
+    Stock,
+    Increment,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum TransferType {
     Full,
     Stock,
     Increment,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+// 任务停止原因，主动停止，或由于错误上线达成停止
+pub enum TaskStopReason {
+    // 正常结束或人为停止
+    Finish,
+    // 任务重错误容忍度达到上线
+    Broken,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -22,6 +54,70 @@ pub enum Task {
     Transfer(TransferTask),
     Compare(CompareTask),
     // TruncateBucket(TaskTruncateBucket),
+}
+
+impl Task {
+    pub fn task_id(&self) -> String {
+        return match self {
+            Task::Transfer(transfer) => transfer.task_id.clone(),
+            Task::Compare(compare) => compare.task_id.clone(),
+        };
+    }
+
+    pub fn task_name(&self) -> String {
+        return match self {
+            Task::Transfer(transfer) => transfer.name.clone(),
+            Task::Compare(compare) => compare.name.clone(),
+        };
+    }
+    pub fn task_type(&self) -> TaskType {
+        match self {
+            Task::Transfer(_) => TaskType::Transfer,
+            Task::Compare(_) => TaskType::Compare,
+        }
+    }
+
+    pub fn meta_dir(&self) -> String {
+        match self {
+            Task::Transfer(t) => t.attributes.meta_dir.clone(),
+            Task::Compare(c) => c.attributes.meta_dir.clone(),
+        }
+    }
+
+    pub fn task_source(&self) -> ObjectStorage {
+        match self {
+            Task::Transfer(t) => t.source.clone(),
+            Task::Compare(c) => c.target.clone(),
+        }
+    }
+
+    pub fn task_target(&self) -> ObjectStorage {
+        match self {
+            Task::Transfer(t) => t.target.clone(),
+            Task::Compare(c) => c.target.clone(),
+        }
+    }
+
+    pub fn set_meta_dir(&mut self, meta_dir: &str) {
+        match self {
+            Task::Transfer(transfer) => {
+                transfer.attributes.meta_dir = meta_dir.to_string();
+            }
+            Task::Compare(compare) => {
+                compare.attributes.meta_dir = meta_dir.to_string();
+            }
+        }
+    }
+    pub fn set_task_id(&mut self, task_id: &str) {
+        match self {
+            Task::Transfer(transfer) => {
+                transfer.task_id = task_id.to_string();
+            }
+            Task::Compare(compare) => {
+                compare.task_id = task_id.to_string();
+            }
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

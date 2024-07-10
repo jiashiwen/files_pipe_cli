@@ -6,6 +6,8 @@ pub fn new_task_cmd() -> Command {
         .subcommand(task_analyze_source())
         .subcommand(task_list_all())
         .subcommand(task_show())
+        .subcommand(task_status())
+        .subcommand(task_checkpoint())
 }
 
 fn task_exec() -> Command {
@@ -35,6 +37,26 @@ fn task_list_all() -> Command {
 fn task_show() -> Command {
     clap::Command::new("show")
         .about("show task description")
+        .args(&[Arg::new("taskid")
+            .value_name("taskid")
+            .required(true)
+            .index(1)
+            .help("analyze source objects destributed")])
+}
+
+fn task_status() -> Command {
+    clap::Command::new("status")
+        .about("show task status")
+        .args(&[Arg::new("taskid")
+            .value_name("taskid")
+            .required(true)
+            .index(1)
+            .help("analyze source objects destributed")])
+}
+
+fn task_checkpoint() -> Command {
+    clap::Command::new("checkpoint")
+        .about("show task checkpoint")
         .args(&[Arg::new("taskid")
             .value_name("taskid")
             .required(true)

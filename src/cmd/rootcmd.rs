@@ -13,8 +13,9 @@ use crate::configure::{get_config_file_path, get_current_config_yml, set_config}
 use crate::interact;
 use crate::interact::INTERACT_STATUS;
 use crate::request::{
-    list_all_tasks, set_current_server, task_show, test_reqwest, ReqTaskId, TaskServer,
-    GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME,
+    list_all_tasks, set_current_server, task_show, task_status, template_transfer_local2local,
+    template_transfer_local2oss, template_transfer_oss2local, template_transfer_oss2oss,
+    test_reqwest, ReqTaskId, TaskServer, GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME,
 };
 use crate::resources::{list_servers_from_cf, remove_server_from_cf, save_task_server_to_cf};
 use clap::{Arg, ArgAction, ArgMatches, Command as Clap_Command};
@@ -237,7 +238,7 @@ fn cmd_match(matches: &ArgMatches) {
                     let task = match task_show(&id).await {
                         Ok(t) => t,
                         Err(e) => {
-                            eprintln!("{:?}", e);
+                            log::error!("{:?}", e);
                             return;
                         }
                     };
@@ -245,19 +246,68 @@ fn cmd_match(matches: &ArgMatches) {
                     let task = match task.data {
                         Some(t) => t,
                         None => {
-                            eprintln!("task is none");
+                            return;
+                        }
+                    };
+                    let task_json = match struct_to_json_string_prettry(&task) {
+                        Ok(j) => j,
+                        Err(e) => {
+                            log::error!("{:?}", e);
                             return;
                         }
                     };
 
-                    println!("{}", struct_to_json_string_prettry(&task).unwrap());
+                    println!("{}", task_json);
                 });
             }
         }
 
         if let Some(_) = task.subcommand_matches("list_all") {
             GLOBAL_RUNTIME.block_on(async move {
-                println!("{:#?}", list_all_tasks().await);
+                let reps = match list_all_tasks().await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        log::error!("{:?}", e);
+                        return;
+                    }
+                };
+                let tasks = match reps.data {
+                    Some(v) => v,
+                    None => return,
+                };
+
+                let mut builder = Builder::default();
+                for task in tasks {
+                    let status = match task_status(&ReqTaskId {
+                        task_id: task.task.task_id(),
+                    })
+                    .await
+                    {
+                        Ok(r) => match r.data {
+                            Some(s) => {
+                                if s.is_running() {
+                                    "running"
+                                } else {
+                                    "stopped"
+                                }
+                            }
+                            None => "stopped",
+                        },
+                        Err(_) => "unknown",
+                    };
+                    let raw = vec![
+                        task.task.task_id(),
+                        task.task.task_name(),
+                        task.task.task_type().to_string(),
+                        status.to_string(),
+                    ];
+                    builder.push_record(raw);
+                }
+
+                let header = vec!["id", "name", "task type", "status"];
+                builder.insert_record(0, header);
+                let table = builder.build();
+                println!("{}", table);
             });
         }
 
@@ -273,22 +323,150 @@ fn cmd_match(matches: &ArgMatches) {
                 test_reqwest()
             }
         }
+
+        if let Some(show) = task.subcommand_matches("status") {
+            if let Some(id) = show.get_one::<String>("taskid") {
+                let task_id = id.to_string();
+                GLOBAL_RUNTIME.block_on(async move {
+                    let id = ReqTaskId { task_id };
+                    let task = match task_status(&id).await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    let task = match task.data {
+                        Some(t) => t,
+                        None => {
+                            return;
+                        }
+                    };
+                    let task_json = match struct_to_json_string_prettry(&task) {
+                        Ok(j) => j,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    println!("{}", task_json);
+                });
+            }
+        }
     }
 
     if let Some(template) = matches.subcommand_matches("template") {
         if let Some(transfer) = template.subcommand_matches("transfer") {
-            if let Some(oss2oss) = transfer.subcommand_matches("oss2oss") {
-                println!("template transfer oss2oss");
+            if let Some(_) = transfer.subcommand_matches("oss2oss") {
+                GLOBAL_RUNTIME.block_on(async move {
+                    let task = match template_transfer_oss2oss().await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    let task = match task.data {
+                        Some(t) => t,
+                        None => {
+                            return;
+                        }
+                    };
+                    let task_json = match struct_to_json_string_prettry(&task) {
+                        Ok(j) => j,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    println!("{}", task_json);
+                });
             }
-            if let Some(oss2local) = transfer.subcommand_matches("oss2local") {
-                println!("template transfer oss2local");
+            if let Some(_) = transfer.subcommand_matches("oss2local") {
+                GLOBAL_RUNTIME.block_on(async move {
+                    let task = match template_transfer_oss2local().await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    let task = match task.data {
+                        Some(t) => t,
+                        None => {
+                            return;
+                        }
+                    };
+                    let task_json = match struct_to_json_string_prettry(&task) {
+                        Ok(j) => j,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    println!("{}", task_json);
+                });
             }
-            if let Some(local2oss) = transfer.subcommand_matches("local2oss") {
-                println!("template transfer local2oss");
+            if let Some(_) = transfer.subcommand_matches("local2oss") {
+                GLOBAL_RUNTIME.block_on(async move {
+                    let task = match template_transfer_local2oss().await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    let task = match task.data {
+                        Some(t) => t,
+                        None => {
+                            return;
+                        }
+                    };
+                    let task_json = match struct_to_json_string_prettry(&task) {
+                        Ok(j) => j,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    println!("{}", task_json);
+                });
             }
 
-            if let Some(local2local) = transfer.subcommand_matches("local2local") {
-                println!("template transfer local2local");
+            if let Some(_) = transfer.subcommand_matches("local2local") {
+                GLOBAL_RUNTIME.block_on(async move {
+                    let task = match template_transfer_local2local().await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    let task = match task.data {
+                        Some(t) => t,
+                        None => {
+                            return;
+                        }
+                    };
+                    let task_json = match struct_to_json_string_prettry(&task) {
+                        Ok(j) => j,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    println!("{}", task_json);
+                });
             }
         }
 
