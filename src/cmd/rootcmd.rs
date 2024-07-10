@@ -210,7 +210,7 @@ fn cmd_match(matches: &ArgMatches) {
             let servers_list = match list_servers_from_cf() {
                 Ok(l) => l,
                 Err(e) => {
-                    eprintln!("{:?}", e);
+                    log::error!("{}", e);
                     return;
                 }
             };

@@ -47,7 +47,7 @@ pub fn init_rocksdb(db_path: &str) -> Result<DBWithThreadMode<MultiThreaded>> {
 }
 
 pub fn save_current_settings(current_settings: &CurrentSettings) -> Result<()> {
-    let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
+    let cf = match GLOBAL_ROCKSDB.cf_handle(CF_CURRENT_SETTITNGS) {
         Some(cf) => cf,
         None => return Err(anyhow!("column family not exist")),
     };
@@ -57,7 +57,7 @@ pub fn save_current_settings(current_settings: &CurrentSettings) -> Result<()> {
     Ok(())
 }
 pub fn get_current_settings() -> Result<CurrentSettings> {
-    let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
+    let cf = match GLOBAL_ROCKSDB.cf_handle(CF_CURRENT_SETTITNGS) {
         Some(cf) => cf,
         None => return Err(anyhow!("column family not exist")),
     };
