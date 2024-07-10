@@ -12,11 +12,16 @@ pub fn new_server_cmd() -> Command {
 fn server_save() -> Command {
     clap::Command::new("save")
         .about("save server")
-        .args(&[Arg::new("server_string")
-            .value_name("server_string")
+        .args(&[Arg::new("name")
+            .value_name("name")
             .required(true)
             .index(1)
-            .help("execute task description yaml file")])
+            .help("server name")])
+        .args(&[Arg::new("url")
+            .value_name("url")
+            .required(true)
+            .index(2)
+            .help("server url")])
 }
 
 fn server_set() -> Command {

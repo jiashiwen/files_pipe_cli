@@ -4,5 +4,6 @@ mod module_respose;
 mod module_storage;
 mod module_task_compare;
 mod modules;
+pub use moduile_task::*;
 pub use module_respose::*;
 pub use modules::*;

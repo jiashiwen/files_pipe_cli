@@ -5,15 +5,18 @@ use crate::cmd::{
     new_command_tree_cmd, new_config_cmd, new_exit_cmd, new_parameters_cmd, new_template,
 };
 use crate::commons::CommandCompleter;
-use crate::commons::{byte_size_str_to_usize, generate_file, generate_files, SubCmd};
+use crate::commons::{
+    byte_size_str_to_usize, generate_file, generate_files, struct_to_json_string_prettry, SubCmd,
+};
 use crate::configure::{generate_default_config, set_config_file_path};
 use crate::configure::{get_config_file_path, get_current_config_yml, set_config};
 use crate::interact;
 use crate::interact::INTERACT_STATUS;
-use crate::request::{list_all_tasks, test_reqwest, GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME};
-use crate::resources::{
-    get_server_url_from_cf, list_servers_from_cf, remove_server_from_cf, save_server_to_cf,
+use crate::request::{
+    list_all_tasks, set_current_server, task_show, test_reqwest, ReqTaskId, TaskServer,
+    GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME,
 };
+use crate::resources::{list_servers_from_cf, remove_server_from_cf, save_task_server_to_cf};
 use clap::{Arg, ArgAction, ArgMatches, Command as Clap_Command};
 use lazy_static::lazy_static;
 use tabled::builder::Builder;
@@ -159,33 +162,41 @@ fn cmd_match(matches: &ArgMatches) {
 
     if let Some(server) = matches.subcommand_matches("server") {
         if let Some(_) = server.subcommand_matches("current") {
-            println!("{:?}", GLOBAL_CURRENT_SERVER.read());
+            GLOBAL_RUNTIME.block_on(async move {
+                println!("{:?}", GLOBAL_CURRENT_SERVER.read().await);
+            });
         }
+
         if let Some(save) = server.subcommand_matches("save") {
-            if let Some(server) = save.get_one::<String>("server_string") {
-                println!("{:?}", save_server_to_cf(server));
-            }
+            let name = match save.get_one::<String>("name") {
+                Some(s) => s.clone(),
+                None => {
+                    return;
+                }
+            };
+
+            let url = match save.get_one::<String>("url") {
+                Some(s) => s.clone(),
+                None => {
+                    return;
+                }
+            };
+
+            let task_server = TaskServer { name, url };
+            match save_task_server_to_cf(&task_server) {
+                Ok(id) => {
+                    println!("server {} saved", id);
+                }
+                Err(e) => log::error!("{:?}", e),
+            };
         }
 
         if let Some(set) = server.subcommand_matches("set") {
             if let Some(id) = set.get_one::<String>("server_id") {
-                let server = match get_server_url_from_cf(id) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("{:?}", e);
-                        return;
-                    }
-                };
-
-                let mut current = match GLOBAL_CURRENT_SERVER.write() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        eprintln!("{:?}", e);
-                        return;
-                    }
-                };
-                *current = server;
-                println!("current server {:?} setted!", current);
+                let server_id = id.to_string();
+                GLOBAL_RUNTIME.block_on(async move {
+                    println!("{:?}", set_current_server(&server_id).await);
+                });
             }
         }
 
@@ -205,12 +216,12 @@ fn cmd_match(matches: &ArgMatches) {
             };
 
             let mut builder = Builder::default();
-            for (id, url) in servers_list {
-                let raw = vec![id, url];
+            for (id, task_server) in servers_list {
+                let raw = vec![id, task_server.name, task_server.url];
                 builder.push_record(raw);
             }
 
-            let header = vec!["server id", "url"];
+            let header = vec!["id", "name", "url"];
             builder.insert_record(0, header);
             let table = builder.build();
             println!("{}", table);
@@ -218,8 +229,34 @@ fn cmd_match(matches: &ArgMatches) {
     }
 
     if let Some(task) = matches.subcommand_matches("task") {
+        if let Some(show) = task.subcommand_matches("show") {
+            if let Some(id) = show.get_one::<String>("taskid") {
+                let task_id = id.to_string();
+                GLOBAL_RUNTIME.block_on(async move {
+                    let id = ReqTaskId { task_id };
+                    let task = match task_show(&id).await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            eprintln!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    let task = match task.data {
+                        Some(t) => t,
+                        None => {
+                            eprintln!("task is none");
+                            return;
+                        }
+                    };
+
+                    println!("{}", struct_to_json_string_prettry(&task).unwrap());
+                });
+            }
+        }
+
         if let Some(_) = task.subcommand_matches("list_all") {
-            GLOBAL_RUNTIME.spawn(async move {
+            GLOBAL_RUNTIME.block_on(async move {
                 println!("{:#?}", list_all_tasks().await);
             });
         }
@@ -300,10 +337,6 @@ fn cmd_match(matches: &ArgMatches) {
             }
         };
         let chunk: usize = match gen_file.get_one::<String>("chunk_size") {
-            // Some(s) => *s,
-            // None => {
-            //     return;
-            // }
             Some(s) => {
                 let size = byte_size_str_to_usize(s);
                 match size {

@@ -1,4 +1,7 @@
+use crate::configure::CurrentSettings;
+use crate::request::TaskServer;
 use anyhow::anyhow;
+use anyhow::Context;
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use rocksdb::IteratorMode;
@@ -8,6 +11,9 @@ use std::sync::Arc;
 use url::Url;
 
 pub const CF_SERVERS: &'static str = "cf_servers";
+pub const CF_CURRENT_SETTITNGS: &'static str = "cf_current_settings";
+
+pub const CURRENT_SETTITNGS_KEY: &'static str = "current_settings";
 
 pub static GLOBAL_ROCKSDB: Lazy<Arc<DBWithThreadMode<MultiThreaded>>> = Lazy::new(|| {
     let rocksdb = match init_rocksdb("files_pipe_cli_rocksdb") {
@@ -32,45 +38,77 @@ pub fn init_rocksdb(db_path: &str) -> Result<DBWithThreadMode<MultiThreaded>> {
     let db = DBWithThreadMode::<MultiThreaded>::open_cf_with_opts(
         &db_opts,
         db_path,
-        vec![(CF_SERVERS, cf_opts)],
+        vec![
+            (CF_SERVERS, cf_opts.clone()),
+            (CF_CURRENT_SETTITNGS, cf_opts.clone()),
+        ],
     )?;
     Ok(db)
 }
 
-pub fn save_server_to_cf(server: &str) -> Result<()> {
+pub fn save_current_settings(current_settings: &CurrentSettings) -> Result<()> {
     let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
         Some(cf) => cf,
         None => return Err(anyhow!("column family not exist")),
     };
 
-    if server_is_saved(server)? {
-        return Err(anyhow!("server is already saved"));
-    }
-    let mut id_generator = SnowflakeIdGenerator::new(1, 1);
-    let id = id_generator.real_time_generate();
-
-    GLOBAL_ROCKSDB.put_cf(
-        &cf,
-        id.to_string().as_bytes(),
-        server.to_string().as_bytes(),
-    )?;
+    let encoded = bincode::serialize(current_settings)?;
+    let _ = GLOBAL_ROCKSDB.put_cf(&cf, CURRENT_SETTITNGS_KEY, encoded)?;
     Ok(())
 }
+pub fn get_current_settings() -> Result<CurrentSettings> {
+    let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
+        Some(cf) => cf,
+        None => return Err(anyhow!("column family not exist")),
+    };
 
-pub fn server_is_saved(server: &str) -> Result<bool> {
+    let current_settings_bytes = match GLOBAL_ROCKSDB.get_cf(&cf, CURRENT_SETTITNGS_KEY)? {
+        Some(v) => v,
+        None => return Err(anyhow!("server not exists")),
+    };
+    let current_settings = bincode::deserialize::<CurrentSettings>(&current_settings_bytes)?;
+    Ok(current_settings)
+}
+
+pub fn save_task_server_to_cf(task_server: &TaskServer) -> Result<i64> {
+    let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
+        Some(cf) => cf,
+        None => return Err(anyhow!("column family not exist")),
+    };
+
+    if task_server_exist(task_server).context(format!("{}:{}", file!(), line!()))? {
+        return Err(anyhow!("server is already saved"));
+    }
+
+    let mut id_generator = SnowflakeIdGenerator::new(1, 1);
+    let id = id_generator.real_time_generate();
+    let encoded: Vec<u8> =
+        bincode::serialize(task_server).context(format!("{}:{}", file!(), line!()))?;
+    GLOBAL_ROCKSDB
+        .put_cf(&cf, id.to_string().as_bytes(), encoded)
+        .context(format!("{}:{}", file!(), line!()))?;
+    Ok(id)
+}
+
+pub fn task_server_exist(task_server: &TaskServer) -> Result<bool> {
     let mut saved = false;
     let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
         Some(cf) => cf,
         None => return Err(anyhow!("column family not exist")),
     };
 
-    let url = Url::parse(server)?;
+    let url = Url::parse(task_server.url.as_str())?;
     let sever_cf_iter = GLOBAL_ROCKSDB.iterator_cf(&cf, IteratorMode::Start);
 
     for item in sever_cf_iter {
         if let Ok(kv) = item {
-            let url_str = String::from_utf8(kv.1.to_vec())?;
-            let saved_url = Url::parse(&url_str)?;
+            let task_server = bincode::deserialize::<TaskServer>(&kv.1).context(format!(
+                "{}:{}",
+                file!(),
+                line!()
+            ))?;
+            let saved_url =
+                Url::parse(&task_server.url).context(format!("{}:{}", file!(), line!()))?;
 
             if url.scheme().eq(saved_url.scheme())
                 && url.host().eq(&saved_url.host())
@@ -85,18 +123,18 @@ pub fn server_is_saved(server: &str) -> Result<bool> {
     Ok(saved)
 }
 
-pub fn get_server_url_from_cf(server_id: &str) -> Result<String> {
+pub fn get_task_server_from_cf(server_id: &str) -> Result<TaskServer> {
     let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
         Some(cf) => cf,
         None => return Err(anyhow!("column family not exist")),
     };
 
-    let server = match GLOBAL_ROCKSDB.get_cf(&cf, server_id)? {
+    let task_server_bytes = match GLOBAL_ROCKSDB.get_cf(&cf, server_id)? {
         Some(v) => v,
         None => return Err(anyhow!("server not exists")),
     };
-    let server_str = String::from_utf8(server)?;
-    Ok(server_str)
+    let task_server = bincode::deserialize::<TaskServer>(&task_server_bytes)?;
+    Ok(task_server)
 }
 
 pub fn remove_server_from_cf(server_id: &str) -> Result<()> {
@@ -108,7 +146,7 @@ pub fn remove_server_from_cf(server_id: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn list_servers_from_cf() -> Result<Vec<(String, String)>> {
+pub fn list_servers_from_cf() -> Result<Vec<(String, TaskServer)>> {
     let mut vec_servers = vec![];
     let cf = match GLOBAL_ROCKSDB.cf_handle(CF_SERVERS) {
         Some(cf) => cf,
@@ -120,9 +158,9 @@ pub fn list_servers_from_cf() -> Result<Vec<(String, String)>> {
     for item in sever_cf_iter {
         if let Ok(kv) = item {
             let key = String::from_utf8(kv.0.to_vec())?;
-            let url_str = String::from_utf8(kv.1.to_vec())?;
+            let task_server = bincode::deserialize::<TaskServer>(&kv.1)?;
 
-            vec_servers.push((key, url_str))
+            vec_servers.push((key, task_server))
         }
     }
 

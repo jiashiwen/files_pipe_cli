@@ -5,6 +5,7 @@ pub fn new_task_cmd() -> Command {
         .subcommand(task_exec())
         .subcommand(task_analyze_source())
         .subcommand(task_list_all())
+        .subcommand(task_show())
 }
 
 fn task_exec() -> Command {
@@ -29,4 +30,14 @@ fn task_analyze_source() -> Command {
 
 fn task_list_all() -> Command {
     clap::Command::new("list_all").about("list_all")
+}
+
+fn task_show() -> Command {
+    clap::Command::new("show")
+        .about("show task description")
+        .args(&[Arg::new("taskid")
+            .value_name("taskid")
+            .required(true)
+            .index(1)
+            .help("analyze source objects destributed")])
 }

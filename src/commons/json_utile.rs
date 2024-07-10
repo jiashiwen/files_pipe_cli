@@ -20,6 +20,14 @@ where
     Ok(json)
 }
 
+pub fn struct_to_json_string_prettry<T>(value: &T) -> Result<String>
+where
+    T: ?Sized + serde::Serialize,
+{
+    let json = serde_json::to_string_pretty(value)?;
+    Ok(json)
+}
+
 #[allow(dead_code)]
 pub fn read_json_file<T>(path: &str) -> Result<T>
 where
