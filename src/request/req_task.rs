@@ -1,4 +1,4 @@
-use super::{ReqTaskId, RespListTask, Task, TaskStatus, GLOBAL_CURRENT_SERVER, GLOBAL_HTTP_CLIENT};
+use super::{RespListTask, Task, TaskId, TaskStatus, GLOBAL_CURRENT_SERVER, GLOBAL_HTTP_CLIENT};
 use crate::request::modules::Response;
 use anyhow::Result;
 
@@ -15,7 +15,7 @@ pub const API_TASK_STATUS: &'static str = "/api/v1/task/status";
 pub const API_TASK_ANALYZE: &'static str = "/api/v1/task/analyze";
 pub const API_TASK_ALL_LIVING: &'static str = "/api/v1/task/all_living";
 
-pub async fn task_show(id: &ReqTaskId) -> Result<Response<Task>> {
+pub async fn task_show(id: &TaskId) -> Result<Response<Task>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
         .await
@@ -33,7 +33,43 @@ pub async fn task_show(id: &ReqTaskId) -> Result<Response<Task>> {
     Ok(resp)
 }
 
-pub async fn task_status(id: &ReqTaskId) -> Result<Response<TaskStatus>> {
+pub async fn task_create(task: &Task) -> Result<Response<TaskId>> {
+    let mut url = GLOBAL_CURRENT_SERVER
+        .read()
+        .await
+        .url
+        .parse::<reqwest::Url>()?;
+    url.set_path(API_TASK_CREATE);
+
+    let resp = GLOBAL_HTTP_CLIENT
+        .post(url)
+        .json(task)
+        .send()
+        .await?
+        .json::<Response<TaskId>>()
+        .await?;
+    Ok(resp)
+}
+
+pub async fn task_remove(id: &TaskId) -> Result<Response<()>> {
+    let mut url = GLOBAL_CURRENT_SERVER
+        .read()
+        .await
+        .url
+        .parse::<reqwest::Url>()?;
+    url.set_path(API_TASK_REMOVE);
+
+    let resp = GLOBAL_HTTP_CLIENT
+        .post(url)
+        .json(id)
+        .send()
+        .await?
+        .json::<Response<()>>()
+        .await?;
+    Ok(resp)
+}
+
+pub async fn task_status(id: &TaskId) -> Result<Response<TaskStatus>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
         .await

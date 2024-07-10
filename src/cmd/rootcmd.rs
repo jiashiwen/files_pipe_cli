@@ -4,18 +4,19 @@ use crate::cmd::cmd_task::new_task_cmd;
 use crate::cmd::{
     new_command_tree_cmd, new_config_cmd, new_exit_cmd, new_parameters_cmd, new_template,
 };
-use crate::commons::CommandCompleter;
 use crate::commons::{
     byte_size_str_to_usize, generate_file, generate_files, struct_to_json_string_prettry, SubCmd,
 };
+use crate::commons::{json_to_struct, CommandCompleter};
 use crate::configure::{generate_default_config, set_config_file_path};
 use crate::configure::{get_config_file_path, get_current_config_yml, set_config};
 use crate::interact;
 use crate::interact::INTERACT_STATUS;
 use crate::request::{
-    list_all_tasks, set_current_server, task_show, task_status, template_transfer_local2local,
-    template_transfer_local2oss, template_transfer_oss2local, template_transfer_oss2oss,
-    test_reqwest, ReqTaskId, TaskServer, GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME,
+    list_all_tasks, set_current_server, task_create, task_remove, task_show, task_status,
+    template_transfer_local2local, template_transfer_local2oss, template_transfer_oss2local,
+    template_transfer_oss2oss, test_reqwest, Task, TaskId, TaskServer, GLOBAL_CURRENT_SERVER,
+    GLOBAL_RUNTIME,
 };
 use crate::resources::{list_servers_from_cf, remove_server_from_cf, save_task_server_to_cf};
 use clap::{Arg, ArgAction, ArgMatches, Command as Clap_Command};
@@ -234,7 +235,7 @@ fn cmd_match(matches: &ArgMatches) {
             if let Some(id) = show.get_one::<String>("taskid") {
                 let task_id = id.to_string();
                 GLOBAL_RUNTIME.block_on(async move {
-                    let id = ReqTaskId { task_id };
+                    let id = TaskId { task_id };
                     let task = match task_show(&id).await {
                         Ok(t) => t,
                         Err(e) => {
@@ -262,6 +263,58 @@ fn cmd_match(matches: &ArgMatches) {
             }
         }
 
+        if let Some(show) = task.subcommand_matches("create") {
+            if let Some(json) = show.get_one::<String>("taskjson") {
+                let task_json = json.to_string();
+                GLOBAL_RUNTIME.block_on(async move {
+                    let task = match json_to_struct::<Task>(&task_json) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{}", e);
+                            return;
+                        }
+                    };
+
+                    let task = match task_create(&task).await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    let task = match task.data {
+                        Some(t) => t,
+                        None => {
+                            return;
+                        }
+                    };
+                    println!("task {} created", task.task_id.as_str());
+                });
+            }
+        }
+
+        if let Some(remove) = task.subcommand_matches("remove") {
+            if let Some(id) = remove.get_one::<String>("taskid") {
+                let task_id = id.to_string();
+                GLOBAL_RUNTIME.block_on(async move {
+                    let _ = match task_remove(&TaskId {
+                        task_id: task_id.clone(),
+                    })
+                    .await
+                    {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    println!("task {} removed", task_id);
+                });
+            }
+        }
+
         if let Some(_) = task.subcommand_matches("list_all") {
             GLOBAL_RUNTIME.block_on(async move {
                 let reps = match list_all_tasks().await {
@@ -278,7 +331,7 @@ fn cmd_match(matches: &ArgMatches) {
 
                 let mut builder = Builder::default();
                 for task in tasks {
-                    let status = match task_status(&ReqTaskId {
+                    let status = match task_status(&TaskId {
                         task_id: task.task.task_id(),
                     })
                     .await
@@ -311,8 +364,8 @@ fn cmd_match(matches: &ArgMatches) {
             });
         }
 
-        if let Some(exec) = task.subcommand_matches("exec") {
-            if let Some(id) = exec.get_one::<String>("taskid") {
+        if let Some(start) = task.subcommand_matches("start") {
+            if let Some(id) = start.get_one::<String>("taskid") {
                 println!("task id:{}", id);
             }
         }
@@ -328,7 +381,7 @@ fn cmd_match(matches: &ArgMatches) {
             if let Some(id) = show.get_one::<String>("taskid") {
                 let task_id = id.to_string();
                 GLOBAL_RUNTIME.block_on(async move {
-                    let id = ReqTaskId { task_id };
+                    let id = TaskId { task_id };
                     let task = match task_status(&id).await {
                         Ok(t) => t,
                         Err(e) => {
