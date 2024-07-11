@@ -7,6 +7,15 @@ pub enum Status {
     Compare(CompareStatus),
 }
 
+impl Status {
+    pub fn to_string(&self) -> String {
+        match self {
+            Status::Transfer(t) => t.to_string(),
+            Status::Compare(c) => c.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TaskStatus {
     pub task_id: String,
@@ -96,6 +105,13 @@ pub enum TransferStatus {
 }
 
 impl TransferStatus {
+    pub fn to_string(&self) -> String {
+        match self {
+            TransferStatus::Starting => "Starting".to_string(),
+            TransferStatus::Running(r) => r.to_string(),
+            TransferStatus::Stopped(s) => s.to_string(),
+        }
+    }
     pub fn is_running_stock(&self) -> bool {
         match self {
             TransferStatus::Running(r) => match r {
@@ -122,4 +138,14 @@ pub enum CompareStatus {
     Starting,
     Running,
     Stopped,
+}
+
+impl CompareStatus {
+    pub fn to_string(&self) -> String {
+        match self {
+            CompareStatus::Starting => "Starting".to_string(),
+            CompareStatus::Running => "Running".to_string(),
+            CompareStatus::Stopped => "Stopped".to_string(),
+        }
+    }
 }

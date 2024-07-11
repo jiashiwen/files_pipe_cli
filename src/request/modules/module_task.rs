@@ -29,6 +29,15 @@ pub enum TransferStage {
     Increment,
 }
 
+impl TransferStage {
+    pub fn to_string(&self) -> String {
+        match self {
+            TransferStage::Stock => "Stock".to_string(),
+            TransferStage::Increment => "Increment".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum TransferType {
@@ -44,6 +53,15 @@ pub enum TaskStopReason {
     Finish,
     // 任务重错误容忍度达到上线
     Broken,
+}
+
+impl TaskStopReason {
+    pub fn to_string(&self) -> String {
+        match self {
+            TaskStopReason::Finish => "Finish".to_string(),
+            TaskStopReason::Broken => "Broken".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

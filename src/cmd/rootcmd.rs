@@ -1,3 +1,5 @@
+use std::os::macos::raw::stat;
+
 use crate::cmd::cmd_gen_file::{new_gen_file_cmd, new_gen_files_cmd};
 use crate::cmd::cmd_server::new_server_cmd;
 use crate::cmd::cmd_task::new_task_cmd;
@@ -13,14 +15,15 @@ use crate::configure::{get_config_file_path, get_current_config_yml, set_config}
 use crate::interact;
 use crate::interact::INTERACT_STATUS;
 use crate::request::{
-    list_all_tasks, set_current_server, task_create, task_remove, task_show, task_status,
-    template_transfer_local2local, template_transfer_local2oss, template_transfer_oss2local,
-    template_transfer_oss2oss, test_reqwest, Task, TaskId, TaskServer, GLOBAL_CURRENT_SERVER,
-    GLOBAL_RUNTIME,
+    list_all_tasks, set_current_server, task_clean, task_create, task_remove, task_show,
+    task_start, task_status, task_stop, task_update, template_transfer_local2local,
+    template_transfer_local2oss, template_transfer_oss2local, template_transfer_oss2oss,
+    test_reqwest, ReqTaskUpdate, Task, TaskId, TaskServer, GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME,
 };
 use crate::resources::{list_servers_from_cf, remove_server_from_cf, save_task_server_to_cf};
 use clap::{Arg, ArgAction, ArgMatches, Command as Clap_Command};
 use lazy_static::lazy_static;
+use rayon::iter::Update;
 use tabled::builder::Builder;
 
 pub const APP_NAME: &'static str = "files_pipe_cli";
@@ -263,8 +266,8 @@ fn cmd_match(matches: &ArgMatches) {
             }
         }
 
-        if let Some(show) = task.subcommand_matches("create") {
-            if let Some(json) = show.get_one::<String>("taskjson") {
+        if let Some(create) = task.subcommand_matches("create") {
+            if let Some(json) = create.get_one::<String>("taskjson") {
                 let task_json = json.to_string();
                 GLOBAL_RUNTIME.block_on(async move {
                     let task = match json_to_struct::<Task>(&task_json) {
@@ -290,6 +293,110 @@ fn cmd_match(matches: &ArgMatches) {
                         }
                     };
                     println!("task {} created", task.task_id.as_str());
+                });
+            }
+        }
+
+        if let Some(update) = task.subcommand_matches("update") {
+            let task_id = match update.get_one::<String>("taskid") {
+                Some(s) => s.clone(),
+                None => {
+                    return;
+                }
+            };
+
+            let task_json = match update.get_one::<String>("taskjson") {
+                Some(s) => s.clone(),
+                None => {
+                    return;
+                }
+            };
+
+            let task = match json_to_struct::<Task>(&task_json) {
+                Ok(t) => t,
+                Err(e) => {
+                    log::error!("{:?}", e);
+                    return;
+                }
+            };
+
+            let req_update = ReqTaskUpdate { task_id, task };
+
+            GLOBAL_RUNTIME.block_on(async move {
+                let resp = match task_update(&req_update).await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::error!("{:?}", e);
+                        return;
+                    }
+                };
+
+                match resp.code.eq(&0) {
+                    true => println!("update task {} ok", req_update.task_id.as_str()),
+                    false => eprintln!("{:?}", resp),
+                };
+            });
+        }
+
+        if let Some(show) = task.subcommand_matches("start") {
+            if let Some(id) = show.get_one::<String>("taskid") {
+                let task_id = id.to_string();
+                GLOBAL_RUNTIME.block_on(async move {
+                    let req_id = TaskId { task_id };
+                    let resp = match task_start(&req_id).await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    match resp.code.eq(&0) {
+                        true => println!("start {} ok", id),
+                        false => println!("{:?}", resp),
+                    }
+                });
+            }
+        }
+
+        if let Some(show) = task.subcommand_matches("stop") {
+            if let Some(id) = show.get_one::<String>("taskid") {
+                let task_id = id.to_string();
+                GLOBAL_RUNTIME.block_on(async move {
+                    let req_id = TaskId { task_id };
+                    let resp = match task_stop(&req_id).await {
+                        Ok(t) => t,
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    match resp.code.eq(&0) {
+                        true => println!("start {} ok", id),
+                        false => println!("{:?}", resp),
+                    }
+                });
+            }
+        }
+
+        if let Some(remove) = task.subcommand_matches("clean") {
+            if let Some(id) = remove.get_one::<String>("taskid") {
+                let task_id = id.to_string();
+                GLOBAL_RUNTIME.block_on(async move {
+                    let _ = match task_clean(&TaskId {
+                        task_id: task_id.clone(),
+                    })
+                    .await
+                    {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+
+                    println!("task {} removed", task_id);
                 });
             }
         }
@@ -331,29 +438,26 @@ fn cmd_match(matches: &ArgMatches) {
 
                 let mut builder = Builder::default();
                 for task in tasks {
+                    let mut raw = vec![
+                        task.task.task_id(),
+                        task.task.task_name(),
+                        task.task.task_type().to_string(),
+                    ];
                     let status = match task_status(&TaskId {
                         task_id: task.task.task_id(),
                     })
                     .await
                     {
-                        Ok(r) => match r.data {
-                            Some(s) => {
-                                if s.is_running() {
-                                    "running"
-                                } else {
-                                    "stopped"
-                                }
-                            }
-                            None => "stopped",
+                        Ok(t_s) => match t_s.data {
+                            Some(s) => s.status.to_string(),
+                            None => "stopped".to_string(),
                         },
-                        Err(_) => "unknown",
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            "stopped".to_string()
+                        }
                     };
-                    let raw = vec![
-                        task.task.task_id(),
-                        task.task.task_name(),
-                        task.task.task_type().to_string(),
-                        status.to_string(),
-                    ];
+                    raw.push(status);
                     builder.push_record(raw);
                 }
 
