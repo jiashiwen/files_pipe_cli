@@ -10,6 +10,7 @@ mod interact;
 mod logger;
 mod request;
 mod resources;
+mod tui;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct Test {

@@ -1,5 +1,3 @@
-use std::os::macos::raw::stat;
-
 use crate::cmd::cmd_gen_file::{new_gen_file_cmd, new_gen_files_cmd};
 use crate::cmd::cmd_server::new_server_cmd;
 use crate::cmd::cmd_task::new_task_cmd;
@@ -21,9 +19,9 @@ use crate::request::{
     test_reqwest, ReqTaskUpdate, Task, TaskId, TaskServer, GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME,
 };
 use crate::resources::{list_servers_from_cf, remove_server_from_cf, save_task_server_to_cf};
+use crate::tui::tui_start;
 use clap::{Arg, ArgAction, ArgMatches, Command as Clap_Command};
 use lazy_static::lazy_static;
-use rayon::iter::Update;
 use tabled::builder::Builder;
 
 pub const APP_NAME: &'static str = "files_pipe_cli";
@@ -40,6 +38,13 @@ lazy_static! {
                 .long("config")
                 .value_name("FILE")
                 .help("Sets a custom config file")
+        )
+        .arg(
+            Arg::new("ui")
+                .short('u')
+                .long("ui")
+                .action(ArgAction::SetTrue)
+                .help("run text ui mode")
         )
         .arg(
             Arg::new("interact")
@@ -128,6 +133,11 @@ fn cmd_match(matches: &ArgMatches) {
         set_config(&get_config_file_path());
     } else {
         set_config("");
+    }
+
+    if matches.get_flag("ui") {
+        tui_start();
+        return;
     }
 
     if matches.get_flag("interact") {
