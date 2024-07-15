@@ -29,6 +29,7 @@ pub fn init_rocksdb(db_path: &str) -> Result<DBWithThreadMode<MultiThreaded>> {
     cf_opts.set_max_write_buffer_number(16);
     cf_opts.set_write_buffer_size(128 * 1024 * 1024);
     cf_opts.set_disable_auto_compactions(true);
+    cf_opts.create_if_missing(true);
 
     let mut db_opts = Options::default();
     // db_opts.set_disable_auto_compactions(true);

@@ -12,20 +12,22 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Tabs, Widget},
 };
-use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
+use strum::{Display, EnumCount, EnumIter, FromRepr, IntoEnumIterator};
 
 use super::{
     destroy,
-    tabs::{AboutTab, EmailTab, NewTab, RecipeTab, TracerouteTab, WeatherTab},
+    tables::{ui_table_server, TableServer},
+    tabs::{AboutTab, EmailTab, RecipeTab, ServerTab, TracerouteTab, WeatherTab},
     term, THEME,
 };
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct App {
     mode: Mode,
     tab: Tab,
+    // table_server: TableServer,
     about_tab: AboutTab,
-    new_tab: NewTab,
+    server_tab: ServerTab,
     recipe_tab: RecipeTab,
     email_tab: EmailTab,
     traceroute_tab: TracerouteTab,
@@ -40,15 +42,28 @@ enum Mode {
     Quit,
 }
 
-#[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Display, EnumIter, FromRepr, EnumCount, PartialEq, Eq)]
 enum Tab {
     #[default]
     About,
-    NewTab,
+    ServerTab,
     Recipe,
     Email,
     Traceroute,
     Weather,
+}
+
+impl Tab {
+    pub fn to_string(&self) -> String {
+        match self {
+            Tab::About => "About".to_string(),
+            Tab::Recipe => "Recipe".to_string(),
+            Tab::Email => "Email".to_string(),
+            Tab::Traceroute => "Traceroute".to_string(),
+            Tab::Weather => "Weather".to_string(),
+            Tab::ServerTab => "ServerTab".to_string(),
+        }
+    }
 }
 
 pub fn run(terminal: &mut Terminal<impl Backend>) -> Result<()> {
@@ -74,6 +89,7 @@ impl App {
         terminal
             .draw(|frame| {
                 frame.render_widget(self, frame.size());
+                // ui(frame, self);
                 if self.mode == Mode::Destroy {
                     destroy::destroy(frame);
                 }
@@ -98,34 +114,56 @@ impl App {
     fn handle_key_press(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
-            KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
-            KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
-            KeyCode::Char('k') | KeyCode::Up => self.prev(),
-            KeyCode::Char('j') | KeyCode::Down => self.next(),
-            KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
+            KeyCode::Tab => self.next_tab(),
+            // KeyCode::Char('p') => {
+            //     if self.tab.to_string().eq("NewTab") {
+            //         self.pop.show_popup = !self.pop.show_popup
+            //     }
+            // }
             _ => {}
+        };
+
+        match self.tab {
+            Tab::About | Tab::Recipe | Tab::Email | Tab::Traceroute | Tab::Weather => {
+                match key.code {
+                    // KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
+                    // KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
+                    KeyCode::Char('k') | KeyCode::Up => self.prev(),
+                    KeyCode::Char('j') | KeyCode::Down => self.next(),
+                    KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
+                    _ => {}
+                }
+            }
+
+            Tab::ServerTab => match key.code {
+                KeyCode::Char('k') | KeyCode::Up => self.server_tab.prev(),
+                KeyCode::Char('j') | KeyCode::Down => self.server_tab.next(),
+                _ => {}
+            },
         };
     }
 
     fn prev(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.prev_row(),
-            Tab::NewTab => {}
+            // Tab::NewTab => {}
             Tab::Recipe => self.recipe_tab.prev(),
             Tab::Email => self.email_tab.prev(),
             Tab::Traceroute => self.traceroute_tab.prev_row(),
             Tab::Weather => self.weather_tab.prev(),
+            _ => {}
         }
     }
 
     fn next(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.next_row(),
-            Tab::NewTab => {}
+            // Tab::NewTab => {}
             Tab::Recipe => self.recipe_tab.next(),
             Tab::Email => self.email_tab.next(),
             Tab::Traceroute => self.traceroute_tab.next_row(),
             Tab::Weather => self.weather_tab.next(),
+            _ => {}
         }
     }
 
@@ -140,6 +178,10 @@ impl App {
     fn destroy(&mut self) {
         self.mode = Mode::Destroy;
     }
+
+    // pub fn show_popup(&self) -> bool {
+    //     self.pop.show_popup.clone()
+    // }
 }
 
 /// Implement Widget for &App rather than for App as we would otherwise have to clone or copy the
@@ -154,7 +196,7 @@ impl Widget for &App {
         ]);
         let [title_bar, tab, bottom_bar] = vertical.areas(area);
 
-        // Block::new().style(THEME.root).render(area, buf);
+        Block::new().style(THEME.root).render(area, buf);
         self.render_title_bar(title_bar, buf);
         self.render_selected_tab(tab, buf);
         App::render_bottom_bar(bottom_bar, buf);
@@ -166,7 +208,7 @@ impl App {
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(43)]);
         let [title, tabs] = layout.areas(area);
 
-        Span::styled("Ratatui", THEME.app_title).render(title, buf);
+        Span::styled("Mario UI", THEME.app_title).render(title, buf);
         let titles = Tab::iter().map(Tab::title);
         Tabs::new(titles)
             .style(THEME.tabs)
@@ -180,7 +222,7 @@ impl App {
     fn render_selected_tab(&self, area: Rect, buf: &mut Buffer) {
         match self.tab {
             Tab::About => self.about_tab.render(area, buf),
-            Tab::NewTab => self.new_tab.render(area, buf),
+            Tab::ServerTab => self.server_tab.render(area, buf),
             Tab::Recipe => self.recipe_tab.render(area, buf),
             Tab::Email => self.email_tab.render(area, buf),
             Tab::Traceroute => self.traceroute_tab.render(area, buf),
@@ -215,7 +257,12 @@ impl App {
 impl Tab {
     fn next(self) -> Self {
         let current_index = self as usize;
-        let next_index = current_index.saturating_add(1);
+        let mut next_index = current_index.saturating_add(1);
+        let count = Self::COUNT;
+        if next_index.eq(&count) {
+            next_index = 0;
+        }
+
         Self::from_repr(next_index).unwrap_or(self)
     }
 
