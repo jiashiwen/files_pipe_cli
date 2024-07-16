@@ -71,13 +71,13 @@ pub fn init_log() {
 
 pub fn tracing_init() {
     // 格式化输出层，并且输出到终端。
-    let formatting_layer = fmt::layer()
-        .pretty()
-        .with_file(true)
-        .with_line_number(true)
-        .with_writer(std::io::stdout)
-        .with_filter(tracing_subscriber::filter::LevelFilter::INFO)
-        .boxed();
+    // let formatting_layer = fmt::layer()
+    //     .pretty()
+    //     .with_file(true)
+    //     .with_line_number(true)
+    //     .with_writer(std::io::stdout)
+    //     .with_filter(tracing_subscriber::filter::LevelFilter::INFO)
+    //     .boxed();
 
     // 文件输出层
     let file_appender = rolling::daily("logs/", "oss_pipe.log");
@@ -89,9 +89,8 @@ pub fn tracing_init() {
         .with_filter(tracing_subscriber::filter::LevelFilter::INFO) // 文件输出日志等级
         .boxed();
 
-    let registry = tracing_subscriber::registry()
-        .with(file_layer)
-        .with(formatting_layer);
+    let registry = tracing_subscriber::registry().with(file_layer);
+    // .with(formatting_layer);
 
     registry.init()
 }

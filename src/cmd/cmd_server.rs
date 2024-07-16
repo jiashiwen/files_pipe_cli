@@ -2,16 +2,16 @@ use clap::{Arg, Command};
 
 pub fn new_server_cmd() -> Command {
     clap::Command::new("server")
-        .subcommand(server_save())
+        .subcommand(server_add())
         .subcommand(server_set())
         .subcommand(server_remove())
         .subcommand(server_list())
         .subcommand(server_current())
 }
 
-fn server_save() -> Command {
-    clap::Command::new("save")
-        .about("save server")
+fn server_add() -> Command {
+    clap::Command::new("add")
+        .about("add server")
         .args(&[Arg::new("name")
             .value_name("name")
             .required(true)

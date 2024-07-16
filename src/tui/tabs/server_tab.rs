@@ -1,7 +1,6 @@
 use crate::{
     request::TaskServer,
-    resources::{list_servers_from_cf, remove_server_from_cf},
-    tui::THEME,
+    resources::{list_servers_from_cf, remove_server_from_cf, save_task_server_to_cf},
 };
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -11,12 +10,13 @@ use ratatui::{
     style::{palette::tailwind, Color, Modifier, Style, Stylize},
     text::{Line, Span, Text},
     widgets::{
-        Block, Cell, Clear, HighlightSpacing, List, ListItem, Paragraph, Row, Scrollbar,
+        Block, Borders, Cell, Clear, HighlightSpacing, List, ListItem, Paragraph, Row, Scrollbar,
         ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Widget,
     },
     Frame,
 };
 use std::sync::Arc;
+use strum::{EnumCount, EnumIter, FromRepr};
 use unicode_width::UnicodeWidthStr;
 
 // use crate::{RgbSwatch, THEME};
@@ -64,29 +64,75 @@ pub static GLOBAL_SERVER_TABLE_DATA: Lazy<Arc<DashMap<String, TaskServer>>> = La
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct NewServerPop {
     pub show: bool,
-    input: String,
+    input_name: String,
+    input_url: String,
     /// Position of cursor in the editor area.
-    character_index: usize,
-    /// Current input mode
-    // input_mode: InputMode,
-    /// History of recorded messages
-    messages: Vec<String>,
+    name_index: usize,
+    url_index: usize,
+    alert_msg: String,
+    selected_input: SelectedInput,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, EnumIter, FromRepr, EnumCount)]
+pub enum SelectedInput {
+    #[default]
+    Name,
+    Url,
 }
 
 impl NewServerPop {
+    pub fn clear(&mut self) {
+        self.input_name = "".to_string();
+        self.input_url = "".to_string();
+        self.name_index = 0;
+        self.url_index = 0;
+        self.alert_msg = "".to_string();
+        self.selected_input = SelectedInput::default();
+    }
+
+    pub fn select_input(&mut self) {
+        let current_index = self.selected_input as usize;
+        let mut next_index = current_index.saturating_add(1);
+        let count = SelectedInput::COUNT;
+        if next_index.eq(&count) {
+            next_index = 0;
+        }
+        self.selected_input =
+            SelectedInput::from_repr(next_index).unwrap_or(SelectedInput::default());
+    }
     pub fn move_cursor_left(&mut self) {
-        let cursor_moved_left = self.character_index.saturating_sub(1);
-        self.character_index = self.clamp_cursor(cursor_moved_left);
+        match self.selected_input {
+            SelectedInput::Name => {
+                let cursor_moved_left = self.name_index.saturating_sub(1);
+                self.name_index = self.clamp_cursor(cursor_moved_left);
+            }
+            SelectedInput::Url => {
+                let cursor_moved_left = self.url_index.saturating_sub(1);
+                self.url_index = self.clamp_cursor(cursor_moved_left);
+            }
+        }
     }
 
     pub fn move_cursor_right(&mut self) {
-        let cursor_moved_right = self.character_index.saturating_add(1);
-        self.character_index = self.clamp_cursor(cursor_moved_right);
+        match self.selected_input {
+            SelectedInput::Name => {
+                let cursor_moved_right = self.name_index.saturating_add(1);
+                self.name_index = self.clamp_cursor(cursor_moved_right);
+            }
+            SelectedInput::Url => {
+                let cursor_moved_right = self.url_index.saturating_add(1);
+                self.url_index = self.clamp_cursor(cursor_moved_right);
+            }
+        }
     }
 
     pub fn enter_char(&mut self, new_char: char) {
         let index = self.byte_index();
-        self.input.insert(index, new_char);
+        match self.selected_input {
+            SelectedInput::Name => self.input_name.insert(index, new_char),
+            SelectedInput::Url => self.input_url.insert(index, new_char),
+        }
+
         self.move_cursor_right();
     }
 
@@ -95,51 +141,92 @@ impl NewServerPop {
     /// Since each character in a string can be contain multiple bytes, it's necessary to calculate
     /// the byte index based on the index of the character.
     fn byte_index(&mut self) -> usize {
-        self.input
-            .char_indices()
-            .map(|(i, _)| i)
-            .nth(self.character_index)
-            .unwrap_or(self.input.len())
+        match self.selected_input {
+            SelectedInput::Name => self
+                .input_name
+                .char_indices()
+                .map(|(i, _)| i)
+                .nth(self.name_index)
+                .unwrap_or(self.input_name.len()),
+            SelectedInput::Url => self
+                .input_url
+                .char_indices()
+                .map(|(i, _)| i)
+                .nth(self.url_index)
+                .unwrap_or(self.input_url.len()),
+        }
     }
 
     pub fn delete_char(&mut self) {
-        let is_not_cursor_leftmost = self.character_index != 0;
-        if is_not_cursor_leftmost {
-            // Method "remove" is not used on the saved text for deleting the selected char.
-            // Reason: Using remove on String works on bytes instead of the chars.
-            // Using remove would require special care because of char boundaries.
+        match self.selected_input {
+            SelectedInput::Name => {
+                let is_not_cursor_leftmost = self.name_index != 0;
+                if is_not_cursor_leftmost {
+                    // Method "remove" is not used on the saved text for deleting the selected char.
+                    // Reason: Using remove on String works on bytes instead of the chars.
+                    // Using remove would require special care because of char boundaries.
 
-            let current_index = self.character_index;
-            let from_left_to_current_index = current_index - 1;
+                    let current_index = self.name_index;
+                    let from_left_to_current_index = current_index - 1;
 
-            // Getting all characters before the selected character.
-            let before_char_to_delete = self.input.chars().take(from_left_to_current_index);
-            // Getting all characters after selected character.
-            let after_char_to_delete = self.input.chars().skip(current_index);
+                    // Getting all characters before the selected character.
+                    let before_char_to_delete =
+                        self.input_name.chars().take(from_left_to_current_index);
+                    // Getting all characters after selected character.
+                    let after_char_to_delete = self.input_name.chars().skip(current_index);
 
-            // Put all characters together except the selected one.
-            // By leaving the selected one out, it is forgotten and therefore deleted.
-            self.input = before_char_to_delete.chain(after_char_to_delete).collect();
-            self.move_cursor_left();
+                    // Put all characters together except the selected one.
+                    // By leaving the selected one out, it is forgotten and therefore deleted.
+                    self.input_name = before_char_to_delete.chain(after_char_to_delete).collect();
+                    self.move_cursor_left();
+                }
+            }
+            SelectedInput::Url => {
+                let is_not_cursor_leftmost = self.url_index != 0;
+                if is_not_cursor_leftmost {
+                    let current_index = self.url_index;
+                    let from_left_to_current_index = current_index - 1;
+                    let before_char_to_delete =
+                        self.input_url.chars().take(from_left_to_current_index);
+                    let after_char_to_delete = self.input_url.chars().skip(current_index);
+                    self.input_url = before_char_to_delete.chain(after_char_to_delete).collect();
+                    self.move_cursor_left();
+                }
+            }
         }
     }
 
     fn clamp_cursor(&self, new_cursor_pos: usize) -> usize {
-        new_cursor_pos.clamp(0, self.input.chars().count())
+        match self.selected_input {
+            SelectedInput::Name => new_cursor_pos.clamp(0, self.input_name.chars().count()),
+            SelectedInput::Url => new_cursor_pos.clamp(0, self.input_url.chars().count()),
+        }
     }
 
     fn reset_cursor(&mut self) {
-        self.character_index = 0;
+        match self.selected_input {
+            SelectedInput::Name => self.name_index = 0,
+            SelectedInput::Url => self.url_index = 0,
+        }
     }
 
-    pub fn submit_message(&mut self) {
-        self.messages.push(self.input.clone());
-        self.input.clear();
-        self.reset_cursor();
+    pub fn add_server(&mut self) {
+        // self.reset_cursor();
+        let task_server = TaskServer {
+            name: self.input_name.clone(),
+            url: self.input_url.clone(),
+        };
+        self.clear();
+        match save_task_server_to_cf(&task_server) {
+            Ok(id) => self.alert_msg = format!("save task {} ok", id),
+            Err(e) => {
+                log::error!("{:}", e);
+                self.alert_msg = "add server error".to_string()
+            }
+        };
     }
 }
 
-// #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ServerTab {
     row_index: usize,
@@ -155,22 +242,39 @@ impl ServerTab {
     pub fn prev(&mut self) {
         self.flush_data();
         // self.row_index = self.row_index.saturating_add(INGREDIENTS.len() - 1) % INGREDIENTS.len();
-        let table_len = match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
-            true => 1,
-            false => GLOBAL_SERVER_TABLE_DATA.len(),
-        };
-        self.row_index = self.row_index.saturating_add(table_len - 1) % table_len;
+        // let table_len = match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
+        //     true => 1,
+        //     false => GLOBAL_SERVER_TABLE_DATA.len(),
+        // };
+        // self.row_index = self.row_index.saturating_add(table_len - 1) % table_len;
+
+        match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
+            true => self.row_index = 0,
+            false => {
+                self.row_index = self
+                    .row_index
+                    .saturating_add(GLOBAL_SERVER_TABLE_DATA.len() - 1)
+                    % GLOBAL_SERVER_TABLE_DATA.len()
+            }
+        }
     }
 
     /// Select the next item in the ingredients list (with wrap around)
     pub fn next(&mut self) {
         self.flush_data();
         // self.row_index = self.row_index.saturating_add(1) % INGREDIENTS.len();
-        let table_len = match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
-            true => 1,
-            false => GLOBAL_SERVER_TABLE_DATA.len(),
+        // let table_len = match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
+        //     true => 1,
+        //     false => GLOBAL_SERVER_TABLE_DATA.len(),
+        // };
+        // self.row_index = self.row_index.saturating_add(1) % table_len;
+
+        match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
+            true => self.row_index = 0,
+            false => {
+                self.row_index = self.row_index.saturating_add(1) % GLOBAL_SERVER_TABLE_DATA.len()
+            }
         };
-        self.row_index = self.row_index.saturating_add(1) % table_len;
     }
 
     pub fn new_server(&mut self) {
@@ -181,6 +285,7 @@ impl ServerTab {
         match self.server_ids.get(self.row_index) {
             Some(id) => {
                 let _ = remove_server_from_cf(id);
+                log::info!("id is {};row index {}", id, self.row_index);
                 self.flush_data();
             }
             None => {}
@@ -204,25 +309,32 @@ impl ServerTab {
         let mut id_len = 2;
         let mut name_len = 0;
         let mut url_len = 0;
-        let mut vec_ids = vec![];
+
         for (id, task_server) in vec_taskserver {
-            if UnicodeWidthStr::width(id.as_str()).gt(&id_len) {
-                id_len = UnicodeWidthStr::width(id.as_str())
-            }
-
-            if UnicodeWidthStr::width(task_server.name.as_str()).gt(&name_len) {
-                name_len = UnicodeWidthStr::width(task_server.name.as_str())
-            }
-
-            if UnicodeWidthStr::width(task_server.url.as_str()).gt(&url_len) {
-                url_len = UnicodeWidthStr::width(task_server.url.as_str())
-            }
-
-            vec_ids.push(id.clone());
             GLOBAL_SERVER_TABLE_DATA.insert(id, task_server);
         }
         GLOBAL_SERVER_TABLE_DATA.shrink_to_fit();
-        self.server_ids = vec_ids;
+
+        let data_iter = GLOBAL_SERVER_TABLE_DATA.iter();
+
+        self.server_ids = data_iter
+            .map(|data| {
+                if UnicodeWidthStr::width(data.key().as_str()).gt(&id_len) {
+                    id_len = UnicodeWidthStr::width(data.key().as_str())
+                }
+
+                if UnicodeWidthStr::width(data.value().name.as_str()).gt(&name_len) {
+                    name_len = UnicodeWidthStr::width(data.value().name.as_str())
+                }
+
+                if UnicodeWidthStr::width(data.value().url.as_str()).gt(&url_len) {
+                    url_len = UnicodeWidthStr::width(data.value().url.as_str())
+                }
+                data.key().to_string()
+            })
+            .collect::<Vec<String>>();
+
+        // self.server_ids = vec_ids;
         let id_len_u16 = id_len.try_into().unwrap();
         let name_len_u16 = name_len.try_into().unwrap();
         let url_len_u16 = url_len.try_into().unwrap();
@@ -246,9 +358,6 @@ impl Widget for ServerTab {
         };
         render_scrollbar(self.row_index, scrollbar_area, buf);
         render_server_table(&self, area, buf);
-        // if self.new_server.show {
-        //     render_new_server_pop(&self.new_server, area, buf);
-        // }
     }
 }
 
@@ -270,8 +379,8 @@ fn render_server_table(server_tab: &ServerTab, area: Rect, buf: &mut Buffer) {
         .collect::<Row>()
         .style(header_style)
         .height(1);
-    let data_iter = GLOBAL_SERVER_TABLE_DATA.iter();
 
+    let data_iter = GLOBAL_SERVER_TABLE_DATA.iter();
     let rows = data_iter.enumerate().map(|(i, data)| {
         let color = match i % 2 {
             0 => server_tab.colors.normal_row_color,
@@ -290,6 +399,7 @@ fn render_server_table(server_tab: &ServerTab, area: Rect, buf: &mut Buffer) {
             .height(4)
     });
     let bar = " █ ";
+
     let table = Table::new(
         rows,
         [
@@ -325,109 +435,47 @@ fn render_scrollbar(position: usize, area: Rect, buf: &mut Buffer) {
         .render(area, buf, &mut state);
 }
 
-// fn render_new_server_pop(new_server: &NewServerPop, area: Rect, buf: &mut Buffer) {
-//     // let block = Block::bordered().title("New Server");
-//     let input_area = centered_rect(60, 20, area);
-//     let input = Paragraph::new(new_server.input.as_str())
-//         .style(Style::default().fg(Color::Yellow))
-//         .block(Block::bordered().title("New Server"));
-//     // f.render_widget(input, input_area);
-//     Widget::render(Clear, input_area, buf); //this clears out the background
-//     Widget::render(input, input_area, buf);
-
-//     // Widget::set_cursor(
-//     //     // Draw the cursor at the current position in the input field.
-//     //     // This position is can be controlled via the left and right arrow key
-//     //     input_area.x + new_server.character_index as u16 + 1,
-//     //     // Move one line down, from the border to the input line
-//     //     input_area.y + 1,
-//     // );
-// }
-
 pub fn new_server_pop_ui(f: &mut Frame, pop: &NewServerPop) {
-    // let vertical = Layout::vertical([
-    //     Constraint::Length(1),
-    //     Constraint::Length(3),
-    //     Constraint::Min(1),
-    // ]);
-    // let [help_area, input_area, messages_area] = vertical.areas(f.size());
-
-    // let (msg, style) = match pop.input_mode {
-    //     InputMode::Normal => (
-    //         vec![
-    //             "Press ".into(),
-    //             "q".bold(),
-    //             " to exit, ".into(),
-    //             "e".bold(),
-    //             " to start editing.".bold(),
-    //         ],
-    //         Style::default().add_modifier(Modifier::RAPID_BLINK),
-    //     ),
-    //     InputMode::Editing => (
-    //         vec![
-    //             "Press ".into(),
-    //             "Esc".bold(),
-    //             " to stop editing, ".into(),
-    //             "Enter".bold(),
-    //             " to record the message".into(),
-    //         ],
-    //         Style::default(),
-    //     ),
-    // };
-    // let text = Text::from(Line::from(msg)).patch_style(style);
-    // let help_message = Paragraph::new(text);
-    // f.render_widget(help_message, help_area);
-
-    let input_area = centered_rect(60, 20, f.size());
-    // let input = Paragraph::new(new_server.input.as_str())
-    //     .style(Style::default().fg(Color::Yellow))
-    //     .block(Block::bordered().title("New Server"));
-    // f.render_widget(input, input_area);
-    // Widget::render(Clear, input_area, buf); //this clears out the background
-    // Widget::render(input, input_area, buf);
-
-    let input = Paragraph::new(pop.input.as_str())
-        .style(Style::default().fg(Color::Yellow))
-        .block(Block::bordered().title("Input"));
+    let input_area = centered_rect(60, 30, f.size());
+    let vertical = Layout::vertical([
+        Constraint::Percentage(20),
+        Constraint::Percentage(30),
+        Constraint::Percentage(30),
+        Constraint::Percentage(20),
+    ]);
+    let [help_area, name_area, url_area, allert_area] = vertical.areas(input_area);
     f.render_widget(Clear, input_area);
-    f.render_widget(input, input_area);
-    f.set_cursor(
-        // Draw the cursor at the current position in the input field.
-        // This position is can be controlled via the left and right arrow key
-        input_area.x + pop.character_index as u16 + 1,
-        // Move one line down, from the border to the input line
-        input_area.y + 1,
-    );
-    // match pop.input_mode {
-    //     InputMode::Normal =>
-    //         // Hide the cursor. `Frame` does this by default, so we don't need to do anything here
-    //         {}
 
-    //     InputMode::Editing => {
-    //         // Make the cursor visible and ask ratatui to put it at the specified coordinates after
-    //         // rendering
-    //         #[allow(clippy::cast_possible_truncation)]
-    //         f.set_cursor(
-    //             // Draw the cursor at the current position in the input field.
-    //             // This position is can be controlled via the left and right arrow key
-    //             input_area.x + pop.character_index as u16 + 1,
-    //             // Move one line down, from the border to the input line
-    //             input_area.y + 1,
-    //         );
-    //     }
-    // }
+    let help = Text::from("input name and url,pass 'Enter' key to add server").centered();
+    f.render_widget(help, help_area);
+    let input_name = Paragraph::new(pop.input_name.as_str())
+        .style(Style::default().fg(Color::Yellow))
+        .block(Block::bordered().title_top(Line::from("Name").right_aligned()));
+    f.render_widget(input_name, name_area);
 
-    let messages: Vec<ListItem> = pop
-        .messages
-        .iter()
-        .enumerate()
-        .map(|(i, m)| {
-            let content = Line::from(Span::raw(format!("{i}: {m}")));
-            ListItem::new(content)
-        })
-        .collect();
-    let messages = List::new(messages).block(Block::bordered().title("Messages"));
-    // f.render_widget(messages, messages_area);
+    let input_url = Paragraph::new(pop.input_url.as_str())
+        .style(Style::default().fg(Color::Yellow))
+        .block(Block::bordered().title_top(Line::from("Url").right_aligned()));
+    f.render_widget(input_url, url_area);
+
+    match pop.selected_input {
+        SelectedInput::Name => {
+            f.set_cursor(
+                // Draw the cursor at the current position in the input field.
+                // This position is can be controlled via the left and right arrow key
+                name_area.x + pop.name_index as u16 + 1,
+                // Move one line down, from the border to the input line
+                name_area.y + 1,
+            );
+        }
+        SelectedInput::Url => {
+            f.set_cursor(url_area.x + pop.url_index as u16 + 1, url_area.y + 1);
+        }
+    }
+
+    // let message_block = Block::new().borders(Borders::NONE);
+    let alert_msg = Text::from(pop.alert_msg.as_str()).centered();
+    f.render_widget(alert_msg, allert_area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

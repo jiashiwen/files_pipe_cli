@@ -182,7 +182,7 @@ fn cmd_match(matches: &ArgMatches) {
             });
         }
 
-        if let Some(save) = server.subcommand_matches("save") {
+        if let Some(save) = server.subcommand_matches("add") {
             let name = match save.get_one::<String>("name") {
                 Some(s) => s.clone(),
                 None => {

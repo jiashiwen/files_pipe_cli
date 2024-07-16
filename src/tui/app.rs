@@ -15,8 +15,6 @@ use ratatui::{
 use strum::{Display, EnumCount, EnumIter, FromRepr, IntoEnumIterator};
 
 use super::{
-    destroy,
-    tables::{ui_table_server, TableServer},
     tabs::{
         new_server_pop_ui, AboutTab, EmailTab, RecipeTab, ServerTab, TracerouteTab, WeatherTab,
     },
@@ -27,7 +25,6 @@ use super::{
 pub struct App {
     mode: Mode,
     tab: Tab,
-    // table_server: TableServer,
     about_tab: AboutTab,
     server_tab: ServerTab,
     recipe_tab: RecipeTab,
@@ -94,9 +91,6 @@ impl App {
                 if self.server_tab.new_server.show {
                     new_server_pop_ui(frame, &self.server_tab.new_server)
                 }
-                // if self.mode == Mode::Destroy {
-                //     destroy::destroy(frame);
-                // }
             })
             .wrap_err("terminal.draw")?;
         Ok(())
@@ -116,12 +110,6 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
-            KeyCode::Tab => self.next_tab(),
-            _ => {}
-        };
-
         match self.tab {
             Tab::About | Tab::Recipe | Tab::Email | Tab::Traceroute | Tab::Weather => {
                 match key.code {
@@ -137,7 +125,12 @@ impl App {
                 if self.server_tab.new_server.show {
                     match key.code {
                         KeyCode::Char('n') => self.server_tab.new_server(),
-                        KeyCode::Enter => self.server_tab.new_server.submit_message(),
+                        KeyCode::Esc => {
+                            self.server_tab.new_server.show = false;
+                            self.server_tab.new_server.clear();
+                        }
+                        KeyCode::Tab => self.server_tab.new_server.select_input(),
+                        KeyCode::Enter => self.server_tab.new_server.add_server(),
                         KeyCode::Char(to_insert) => {
                             self.server_tab.new_server.enter_char(to_insert);
                         }
@@ -163,6 +156,12 @@ impl App {
                     _ => {}
                 }
             }
+        };
+
+        match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
+            KeyCode::Tab => self.next_tab(),
+            _ => {}
         };
     }
 
@@ -243,7 +242,10 @@ impl App {
     fn render_selected_tab(&self, area: Rect, buf: &mut Buffer) {
         match self.tab {
             Tab::About => self.about_tab.render(area, buf),
-            Tab::ServerTab => self.server_tab.clone().render(area, buf),
+            Tab::ServerTab => {
+                self.server_tab.clone().flush_data();
+                self.server_tab.clone().render(area, buf);
+            }
             Tab::Recipe => self.recipe_tab.render(area, buf),
             Tab::Email => self.email_tab.render(area, buf),
             Tab::Traceroute => self.traceroute_tab.render(area, buf),
