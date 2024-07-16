@@ -17,7 +17,9 @@ use strum::{Display, EnumCount, EnumIter, FromRepr, IntoEnumIterator};
 use super::{
     destroy,
     tables::{ui_table_server, TableServer},
-    tabs::{AboutTab, EmailTab, RecipeTab, ServerTab, TracerouteTab, WeatherTab},
+    tabs::{
+        new_server_pop_ui, AboutTab, EmailTab, RecipeTab, ServerTab, TracerouteTab, WeatherTab,
+    },
     term, THEME,
 };
 
@@ -89,10 +91,12 @@ impl App {
         terminal
             .draw(|frame| {
                 frame.render_widget(self, frame.size());
-                // ui(frame, self);
-                if self.mode == Mode::Destroy {
-                    destroy::destroy(frame);
+                if self.server_tab.new_server.show {
+                    new_server_pop_ui(frame, &self.server_tab.new_server)
                 }
+                // if self.mode == Mode::Destroy {
+                //     destroy::destroy(frame);
+                // }
             })
             .wrap_err("terminal.draw")?;
         Ok(())
@@ -115,19 +119,12 @@ impl App {
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
             KeyCode::Tab => self.next_tab(),
-            // KeyCode::Char('p') => {
-            //     if self.tab.to_string().eq("NewTab") {
-            //         self.pop.show_popup = !self.pop.show_popup
-            //     }
-            // }
             _ => {}
         };
 
         match self.tab {
             Tab::About | Tab::Recipe | Tab::Email | Tab::Traceroute | Tab::Weather => {
                 match key.code {
-                    // KeyCode::Char('h') | KeyCode::Left => self.prev_tab(),
-                    // KeyCode::Char('l') | KeyCode::Right => self.next_tab(),
                     KeyCode::Char('k') | KeyCode::Up => self.prev(),
                     KeyCode::Char('j') | KeyCode::Down => self.next(),
                     KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
@@ -135,18 +132,43 @@ impl App {
                 }
             }
 
-            Tab::ServerTab => match key.code {
-                KeyCode::Char('k') | KeyCode::Up => self.server_tab.prev(),
-                KeyCode::Char('j') | KeyCode::Down => self.server_tab.next(),
-                _ => {}
-            },
+            Tab::ServerTab => {
+                self.server_tab.flush_data();
+                if self.server_tab.new_server.show {
+                    match key.code {
+                        KeyCode::Char('n') => self.server_tab.new_server(),
+                        KeyCode::Enter => self.server_tab.new_server.submit_message(),
+                        KeyCode::Char(to_insert) => {
+                            self.server_tab.new_server.enter_char(to_insert);
+                        }
+                        KeyCode::Backspace => {
+                            self.server_tab.new_server.delete_char();
+                        }
+                        KeyCode::Left => {
+                            self.server_tab.new_server.move_cursor_left();
+                        }
+                        KeyCode::Right => {
+                            self.server_tab.new_server.move_cursor_right();
+                        }
+
+                        _ => {}
+                    }
+                    return;
+                }
+                match key.code {
+                    KeyCode::Char('k') | KeyCode::Up => self.server_tab.prev(),
+                    KeyCode::Char('j') | KeyCode::Down => self.server_tab.next(),
+                    KeyCode::Char('n') => self.server_tab.new_server(),
+                    KeyCode::Char('d') => self.server_tab.delete_server(),
+                    _ => {}
+                }
+            }
         };
     }
 
     fn prev(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.prev_row(),
-            // Tab::NewTab => {}
             Tab::Recipe => self.recipe_tab.prev(),
             Tab::Email => self.email_tab.prev(),
             Tab::Traceroute => self.traceroute_tab.prev_row(),
@@ -158,7 +180,6 @@ impl App {
     fn next(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.next_row(),
-            // Tab::NewTab => {}
             Tab::Recipe => self.recipe_tab.next(),
             Tab::Email => self.email_tab.next(),
             Tab::Traceroute => self.traceroute_tab.next_row(),
@@ -222,7 +243,7 @@ impl App {
     fn render_selected_tab(&self, area: Rect, buf: &mut Buffer) {
         match self.tab {
             Tab::About => self.about_tab.render(area, buf),
-            Tab::ServerTab => self.server_tab.render(area, buf),
+            Tab::ServerTab => self.server_tab.clone().render(area, buf),
             Tab::Recipe => self.recipe_tab.render(area, buf),
             Tab::Email => self.email_tab.render(area, buf),
             Tab::Traceroute => self.traceroute_tab.render(area, buf),

@@ -82,14 +82,7 @@ pub struct TableServer {
 impl Widget for TableServer {
     fn render(mut self, area: Rect, buf: &mut Buffer) {
         let rects = Layout::vertical([Constraint::Min(5), Constraint::Length(3)]).split(area);
-
         self.set_colors();
-
-        // render_table(f, app, rects[0]);
-
-        // render_scrollbar(f, app, rects[0]);
-
-        // render_footer(f, app, rects[1]);
         self.render_table_widget(rects[0], buf);
         self.render_scrollbar_widget(rects[0], buf);
         self.render_footer_widget(rects[1], buf);
