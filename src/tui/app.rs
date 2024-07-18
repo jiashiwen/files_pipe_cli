@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use color_eyre::{eyre::Context, Result};
 use itertools::Itertools;
@@ -218,7 +218,7 @@ impl Widget for &App {
 
         Block::new().style(THEME.root).render(area, buf);
         self.render_title_bar(title_bar, buf);
-        self.render_selected_tab(tab, buf);
+        self.clone().render_selected_tab(tab, buf);
         App::render_bottom_bar(bottom_bar, buf);
     }
 }
@@ -239,12 +239,13 @@ impl App {
             .render(tabs, buf);
     }
 
-    fn render_selected_tab(&self, area: Rect, buf: &mut Buffer) {
+    fn render_selected_tab(self, area: Rect, buf: &mut Buffer) {
         match self.tab {
             Tab::About => self.about_tab.render(area, buf),
             Tab::ServerTab => {
-                self.server_tab.clone().flush_data();
-                self.server_tab.clone().render(area, buf);
+                let mut tab = self.server_tab.clone();
+                tab.flush_data();
+                tab.render(area, buf);
             }
             Tab::Recipe => self.recipe_tab.render(area, buf),
             Tab::Email => self.email_tab.render(area, buf),

@@ -15,9 +15,9 @@ use ratatui::{
     },
     Frame,
 };
-use std::sync::Arc;
+use std::{ops::Sub, sync::Arc};
 use strum::{EnumCount, EnumIter, FromRepr};
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 // use crate::{RgbSwatch, THEME};
 
@@ -67,8 +67,10 @@ pub struct NewServerPop {
     input_name: String,
     input_url: String,
     /// Position of cursor in the editor area.
-    name_index: usize,
-    url_index: usize,
+    name_char_index: usize,
+    name_cursor_index: usize,
+    url_char_index: usize,
+    url_cursor_index: usize,
     alert_msg: String,
     selected_input: SelectedInput,
 }
@@ -84,8 +86,10 @@ impl NewServerPop {
     pub fn clear(&mut self) {
         self.input_name = "".to_string();
         self.input_url = "".to_string();
-        self.name_index = 0;
-        self.url_index = 0;
+        self.name_char_index = 0;
+        self.url_char_index = 0;
+        self.name_cursor_index = 0;
+        self.url_cursor_index = 0;
         self.alert_msg = "".to_string();
         self.selected_input = SelectedInput::default();
     }
@@ -101,27 +105,85 @@ impl NewServerPop {
             SelectedInput::from_repr(next_index).unwrap_or(SelectedInput::default());
     }
     pub fn move_cursor_left(&mut self) {
-        match self.selected_input {
-            SelectedInput::Name => {
-                let cursor_moved_left = self.name_index.saturating_sub(1);
-                self.name_index = self.clamp_cursor(cursor_moved_left);
-            }
-            SelectedInput::Url => {
-                let cursor_moved_left = self.url_index.saturating_sub(1);
-                self.url_index = self.clamp_cursor(cursor_moved_left);
+        let (move_left_idx, move_left_str) = match self.selected_input {
+            SelectedInput::Name => (self.name_char_index, self.input_name.clone()),
+            SelectedInput::Url => (self.url_char_index, self.input_url.clone()),
+        };
+        log::info!("idx:{}", move_left_idx);
+
+        let chars_size: Vec<usize> = move_left_str
+            .char_indices()
+            .map(|(_, c)| {
+                let char_size = match UnicodeWidthChar::width(c) {
+                    Some(s) => s,
+                    None => 0,
+                };
+                char_size
+            })
+            .collect::<Vec<_>>();
+        let move_left = match chars_size.get(move_left_idx) {
+            Some(s) => *s,
+            None => 1,
+        };
+
+        if move_left_idx > 0 {
+            match self.selected_input {
+                SelectedInput::Name => {
+                    // let cursor_moved_left = self.name_index.saturating_sub(1);
+                    // self.name_index = self.clamp_cursor(cursor_moved_left);
+                    (self.name_char_index, self.name_cursor_index) = self.clamp_cursor(
+                        self.name_char_index.saturating_sub(1),
+                        self.name_cursor_index.sub(move_left),
+                    );
+                }
+                SelectedInput::Url => {
+                    // let cursor_moved_left = self.url_char_index.saturating_sub(1);
+                    // self.url_char_index = self.clamp_cursor(cursor_moved_left);
+                    (self.url_char_index, self.url_cursor_index) = self.clamp_cursor(
+                        self.url_char_index.saturating_sub(1),
+                        self.url_cursor_index.sub(move_left),
+                    );
+                }
             }
         }
     }
 
     pub fn move_cursor_right(&mut self) {
+        let (move_right_idx, move_right_str) = match self.selected_input {
+            SelectedInput::Name => (self.name_char_index, self.input_name.clone()),
+            SelectedInput::Url => (self.url_char_index, self.input_url.clone()),
+        };
+        let chars_size: Vec<usize> = move_right_str
+            .char_indices()
+            .map(|(_, c)| {
+                let char_size = match UnicodeWidthChar::width(c) {
+                    Some(s) => s,
+                    None => 0,
+                };
+                char_size
+            })
+            .collect::<Vec<_>>();
+        let move_right = match chars_size.get(move_right_idx) {
+            Some(s) => *s,
+            None => 0,
+        };
         match self.selected_input {
             SelectedInput::Name => {
-                let cursor_moved_right = self.name_index.saturating_add(1);
-                self.name_index = self.clamp_cursor(cursor_moved_right);
+                // let cursor_moved_right = self.name_index.saturating_add(1);
+                // self.name_index = self.clamp_cursor(cursor_moved_right);
+                (self.name_char_index, self.name_cursor_index) = self.clamp_cursor(
+                    self.name_char_index.saturating_add(1),
+                    self.name_cursor_index.saturating_add(move_right),
+                );
             }
             SelectedInput::Url => {
-                let cursor_moved_right = self.url_index.saturating_add(1);
-                self.url_index = self.clamp_cursor(cursor_moved_right);
+                // let cursor_moved_right = self.url_char_index.saturating_add(1);
+                // self.url_index = self.clamp_cursor(cursor_moved_right);
+                // self.url_char_index = self.clamp_cursor(move_right);
+                (self.url_char_index, self.url_cursor_index) = self.clamp_cursor(
+                    self.url_char_index.saturating_add(1),
+                    self.url_cursor_index.saturating_add(move_right),
+                );
             }
         }
     }
@@ -132,7 +194,6 @@ impl NewServerPop {
             SelectedInput::Name => self.input_name.insert(index, new_char),
             SelectedInput::Url => self.input_url.insert(index, new_char),
         }
-
         self.move_cursor_right();
     }
 
@@ -146,27 +207,42 @@ impl NewServerPop {
                 .input_name
                 .char_indices()
                 .map(|(i, _)| i)
-                .nth(self.name_index)
+                .nth(self.name_cursor_index)
                 .unwrap_or(self.input_name.len()),
             SelectedInput::Url => self
                 .input_url
                 .char_indices()
                 .map(|(i, _)| i)
-                .nth(self.url_index)
+                // .nth(self.url_char_index)
+                .nth(self.url_cursor_index)
                 .unwrap_or(self.input_url.len()),
         }
+        // match self.selected_input {
+        //     SelectedInput::Name => self
+        //         .input_name
+        //         .char_indices()
+        //         .map(|(i, _)| i)
+        //         .nth(self.name_index)
+        //         .unwrap_or(self.input_name.len()),
+        //     SelectedInput::Url => self
+        //         .input_url
+        //         .char_indices()
+        //         .map(|(i, _)| i)
+        //         .nth(self.url_index)
+        //         .unwrap_or(self.input_url.len()),
+        // }
     }
 
     pub fn delete_char(&mut self) {
         match self.selected_input {
             SelectedInput::Name => {
-                let is_not_cursor_leftmost = self.name_index != 0;
+                let is_not_cursor_leftmost = self.name_char_index != 0;
                 if is_not_cursor_leftmost {
                     // Method "remove" is not used on the saved text for deleting the selected char.
                     // Reason: Using remove on String works on bytes instead of the chars.
                     // Using remove would require special care because of char boundaries.
 
-                    let current_index = self.name_index;
+                    let current_index = self.name_char_index;
                     let from_left_to_current_index = current_index - 1;
 
                     // Getting all characters before the selected character.
@@ -182,9 +258,9 @@ impl NewServerPop {
                 }
             }
             SelectedInput::Url => {
-                let is_not_cursor_leftmost = self.url_index != 0;
+                let is_not_cursor_leftmost = self.url_char_index != 0;
                 if is_not_cursor_leftmost {
-                    let current_index = self.url_index;
+                    let current_index = self.url_char_index;
                     let from_left_to_current_index = current_index - 1;
                     let before_char_to_delete =
                         self.input_url.chars().take(from_left_to_current_index);
@@ -196,17 +272,38 @@ impl NewServerPop {
         }
     }
 
-    fn clamp_cursor(&self, new_cursor_pos: usize) -> usize {
-        match self.selected_input {
-            SelectedInput::Name => new_cursor_pos.clamp(0, self.input_name.chars().count()),
-            SelectedInput::Url => new_cursor_pos.clamp(0, self.input_url.chars().count()),
-        }
+    fn clamp_cursor(&self, index_pose: usize, new_cursor_pos: usize) -> (usize, usize) {
+        let clamp_str = match self.selected_input {
+            SelectedInput::Name => self.input_name.clone(),
+            SelectedInput::Url => self.input_url.clone(),
+        };
+        let mut max = 0;
+        let chars_size: Vec<usize> = clamp_str
+            .char_indices()
+            .map(|(_, c)| {
+                let char_size = match UnicodeWidthChar::width(c) {
+                    Some(s) => s,
+                    None => 0,
+                };
+                max += char_size;
+                char_size
+            })
+            .collect::<Vec<_>>();
+        let idx_clamp = match self.selected_input {
+            SelectedInput::Name => index_pose.clamp(0, self.input_name.chars().count()),
+            SelectedInput::Url => index_pose.clamp(0, self.input_url.chars().count()),
+        };
+        (idx_clamp, new_cursor_pos.clamp(0, max))
+        // match self.selected_input {
+        //     SelectedInput::Name => new_cursor_pos.clamp(0, self.input_name.chars().count()),
+        //     SelectedInput::Url => new_cursor_pos.clamp(0, self.input_url.chars().count()),
+        // }
     }
 
     fn reset_cursor(&mut self) {
         match self.selected_input {
-            SelectedInput::Name => self.name_index = 0,
-            SelectedInput::Url => self.url_index = 0,
+            SelectedInput::Name => self.name_char_index = 0,
+            SelectedInput::Url => self.url_char_index = 0,
         }
     }
 
@@ -241,13 +338,6 @@ impl ServerTab {
     /// Select the previous item in the ingredients list (with wrap around)
     pub fn prev(&mut self) {
         self.flush_data();
-        // self.row_index = self.row_index.saturating_add(INGREDIENTS.len() - 1) % INGREDIENTS.len();
-        // let table_len = match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
-        //     true => 1,
-        //     false => GLOBAL_SERVER_TABLE_DATA.len(),
-        // };
-        // self.row_index = self.row_index.saturating_add(table_len - 1) % table_len;
-
         match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
             true => self.row_index = 0,
             false => {
@@ -262,13 +352,6 @@ impl ServerTab {
     /// Select the next item in the ingredients list (with wrap around)
     pub fn next(&mut self) {
         self.flush_data();
-        // self.row_index = self.row_index.saturating_add(1) % INGREDIENTS.len();
-        // let table_len = match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
-        //     true => 1,
-        //     false => GLOBAL_SERVER_TABLE_DATA.len(),
-        // };
-        // self.row_index = self.row_index.saturating_add(1) % table_len;
-
         match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
             true => self.row_index = 0,
             false => {
@@ -285,7 +368,6 @@ impl ServerTab {
         match self.server_ids.get(self.row_index) {
             Some(id) => {
                 let _ = remove_server_from_cf(id);
-                log::info!("id is {};row index {}", id, self.row_index);
                 self.flush_data();
             }
             None => {}
@@ -463,13 +545,14 @@ pub fn new_server_pop_ui(f: &mut Frame, pop: &NewServerPop) {
             f.set_cursor(
                 // Draw the cursor at the current position in the input field.
                 // This position is can be controlled via the left and right arrow key
-                name_area.x + pop.name_index as u16 + 1,
+                // name_area.x + pop.name_char_index as u16 + 1,
+                name_area.x + pop.name_cursor_index as u16 + 1,
                 // Move one line down, from the border to the input line
                 name_area.y + 1,
             );
         }
         SelectedInput::Url => {
-            f.set_cursor(url_area.x + pop.url_index as u16 + 1, url_area.y + 1);
+            f.set_cursor(url_area.x + pop.url_cursor_index as u16 + 1, url_area.y + 1);
         }
     }
 
