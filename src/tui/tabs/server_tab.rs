@@ -322,7 +322,7 @@ pub struct ServerTab {
 impl ServerTab {
     /// Select the previous item in the ingredients list (with wrap around)
     pub fn prev(&mut self) {
-        self.flush_data();
+        self.refresh_data();
         match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
             true => self.row_index = 0,
             false => {
@@ -336,7 +336,7 @@ impl ServerTab {
 
     /// Select the next item in the ingredients list (with wrap around)
     pub fn next(&mut self) {
-        self.flush_data();
+        self.refresh_data();
         match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
             true => self.row_index = 0,
             false => {
@@ -353,7 +353,7 @@ impl ServerTab {
         match self.server_ids.get(self.row_index) {
             Some(id) => {
                 let _ = remove_server_from_cf(id);
-                self.flush_data();
+                self.refresh_data();
             }
             None => {}
         };
@@ -363,7 +363,7 @@ impl ServerTab {
         self.colors = TableColors::new(&PALETTES[self.color_index]);
     }
 
-    pub fn flush_data(&mut self) {
+    pub fn refresh_data(&mut self) {
         let vec_taskserver = match list_servers_from_cf() {
             Ok(v) => v,
             Err(e) => {
@@ -546,7 +546,7 @@ pub fn new_server_pop_ui(f: &mut Frame, pop: &NewServerPop) {
     f.render_widget(alert_msg, allert_area);
 }
 
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::vertical([
         Constraint::Percentage((100 - percent_y) / 2),
         Constraint::Percentage(percent_y),

@@ -1,5 +1,6 @@
 use color_eyre::{eyre::Context, Result};
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use ratatui::{
     backend::Backend,
     buffer::Buffer,
@@ -10,15 +11,35 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Tabs, Widget},
 };
-use std::time::Duration;
+use std::{
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 use strum::{Display, EnumCount, EnumIter, FromRepr, IntoEnumIterator};
+use tui_textarea::TextArea;
 
 use super::{
+    pops::{pop_task_editor_ui, PopTaskEditor},
     tabs::{
-        new_server_pop_ui, AboutTab, EmailTab, RecipeTab, ServerTab, TracerouteTab, WeatherTab,
+        new_server_pop_ui, AboutTab, EmailTab, RecipeTab, ServerTab, TaskTab, TracerouteTab,
+        WeatherTab,
     },
     term, THEME,
 };
+
+pub static GLOBAL_TASK_EDITOR: Lazy<Arc<RwLock<PopTaskEditor>>> = Lazy::new(|| {
+    let server_table_data = Arc::new(RwLock::new(PopTaskEditor {
+        show: false,
+        editor: TextArea::default(),
+        alert_msg: "".to_string(),
+    }));
+    // let server_table_data = PopTaskEditor {
+    //     show: false,
+    //     editor: TextArea::default(),
+    //     alert_msg: "".to_string(),
+    // };
+    server_table_data
+});
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct App {
@@ -26,6 +47,7 @@ pub struct App {
     tab: Tab,
     about_tab: AboutTab,
     server_tab: ServerTab,
+    task_tab: TaskTab,
     recipe_tab: RecipeTab,
     email_tab: EmailTab,
     traceroute_tab: TracerouteTab,
@@ -45,23 +67,10 @@ enum Tab {
     #[default]
     About,
     ServerTab,
-    // Recipe,
-    // Email,
-    // Traceroute,
-    // Weather,
-}
-
-impl Tab {
-    pub fn to_string(&self) -> String {
-        match self {
-            Tab::About => "About".to_string(),
-            Tab::ServerTab => "ServerTab".to_string(),
-            // Tab::Recipe => "Recipe".to_string(),
-            // Tab::Email => "Email".to_string(),
-            // Tab::Traceroute => "Traceroute".to_string(),
-            // Tab::Weather => "Weather".to_string(),
-        }
-    }
+    TaskTab, // Recipe,
+             // Email,
+             // Traceroute,
+             // Weather,
 }
 
 pub fn run(terminal: &mut Terminal<impl Backend>) -> Result<()> {
@@ -89,6 +98,10 @@ impl App {
                 frame.render_widget(self, frame.size());
                 if self.server_tab.new_server.show {
                     new_server_pop_ui(frame, &self.server_tab.new_server)
+                }
+                if GLOBAL_TASK_EDITOR.read().unwrap().show {
+                    let editor = GLOBAL_TASK_EDITOR.read().unwrap();
+                    pop_task_editor_ui(frame, &editor);
                 }
             })
             .wrap_err("terminal.draw")?;
@@ -124,9 +137,8 @@ impl App {
                 KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
                 _ => {}
             },
-
             Tab::ServerTab => {
-                self.server_tab.flush_data();
+                self.server_tab.refresh_data();
                 if self.server_tab.new_server.show {
                     match key.code {
                         KeyCode::Char('n') => self.server_tab.new_server(),
@@ -161,6 +173,15 @@ impl App {
                     _ => {}
                 }
             }
+
+            Tab::TaskTab => match key.code {
+                KeyCode::Char('k') | KeyCode::Up => self.task_tab.prev(),
+                KeyCode::Char('j') | KeyCode::Down => self.task_tab.next(),
+                KeyCode::Char('f') => self.task_tab.refresh_data(),
+                KeyCode::Char('e') => GLOBAL_TASK_EDITOR.write().unwrap().show(),
+                _ => {}
+            },
+            _ => {}
         };
 
         match key.code {
@@ -224,6 +245,12 @@ impl Widget for &App {
         Block::new().style(THEME.root).render(area, buf);
         self.render_title_bar(title_bar, buf);
         self.clone().render_selected_tab(tab, buf);
+        GLOBAL_TASK_EDITOR
+            .read()
+            .unwrap()
+            .editor
+            .widget()
+            .render(area, buf);
         App::render_bottom_bar(bottom_bar, buf);
     }
 }
@@ -249,8 +276,13 @@ impl App {
             Tab::About => self.about_tab.render(area, buf),
             Tab::ServerTab => {
                 let mut tab = self.server_tab.clone();
-                tab.flush_data();
+                tab.refresh_data();
                 tab.render(area, buf);
+            }
+            Tab::TaskTab => {
+                let mut tab = self.task_tab.clone();
+                tab.refresh_data();
+                tab.render(area, buf)
             } // Tab::Recipe => self.recipe_tab.render(area, buf),
               // Tab::Email => self.email_tab.render(area, buf),
               // Tab::Traceroute => self.traceroute_tab.render(area, buf),

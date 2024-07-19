@@ -1,6 +1,7 @@
 use crate::{
-    request::TaskServer,
+    request::{list_all_tasks, task_status, TaskId, TaskServer, GLOBAL_RUNTIME},
     resources::{list_servers_from_cf, remove_server_from_cf, save_task_server_to_cf},
+    tui::pops::PopTaskEditor,
 };
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -56,55 +57,54 @@ impl TableColors {
     }
 }
 
-pub static GLOBAL_SERVER_TABLE_DATA: Lazy<Arc<DashMap<String, TaskServer>>> = Lazy::new(|| {
-    let server_table_data = Arc::new(DashMap::<String, TaskServer>::new());
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct TaskRow {
+    id: String,
+    name: String,
+    task_type: String,
+    status: String,
+}
+
+pub static GLOBAL_TASKS_LIST: Lazy<Arc<DashMap<String, TaskRow>>> = Lazy::new(|| {
+    let server_table_data = Arc::new(DashMap::<String, TaskRow>::new());
     server_table_data
 });
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TaskTab {
     row_index: usize,
-    server_ids: Vec<String>,
+    task_ids: Vec<String>,
     colors: TableColors,
     color_index: usize,
-    longest_item_lens: (u16, u16, u16),
+    longest_item_lens: (u16, u16, u16, u16),
+    // task_editor: PopTaskEditor<'a>,
 }
 
 impl TaskTab {
     /// Select the previous item in the ingredients list (with wrap around)
     pub fn prev(&mut self) {
-        self.flush_data();
-        match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
+        match GLOBAL_TASKS_LIST.len().eq(&0) {
             true => self.row_index = 0,
             false => {
-                self.row_index = self
-                    .row_index
-                    .saturating_add(GLOBAL_SERVER_TABLE_DATA.len() - 1)
-                    % GLOBAL_SERVER_TABLE_DATA.len()
+                self.row_index = self.row_index.saturating_add(GLOBAL_TASKS_LIST.len() - 1)
+                    % GLOBAL_TASKS_LIST.len()
             }
         }
     }
 
     /// Select the next item in the ingredients list (with wrap around)
     pub fn next(&mut self) {
-        self.flush_data();
-        match GLOBAL_SERVER_TABLE_DATA.len().eq(&0) {
+        match GLOBAL_TASKS_LIST.len().eq(&0) {
             true => self.row_index = 0,
-            false => {
-                self.row_index = self.row_index.saturating_add(1) % GLOBAL_SERVER_TABLE_DATA.len()
-            }
+            false => self.row_index = self.row_index.saturating_add(1) % GLOBAL_TASKS_LIST.len(),
         };
     }
 
-    pub fn new_server(&mut self) {
-        self.new_server.show = !self.new_server.show;
-    }
-
     pub fn delete_server(&mut self) {
-        match self.server_ids.get(self.row_index) {
+        match self.task_ids.get(self.row_index) {
             Some(id) => {
                 let _ = remove_server_from_cf(id);
-                self.flush_data();
+                self.refresh_data();
             }
             None => {}
         };
@@ -114,28 +114,59 @@ impl TaskTab {
         self.colors = TableColors::new(&PALETTES[self.color_index]);
     }
 
-    pub fn flush_data(&mut self) {
-        let vec_taskserver = match list_servers_from_cf() {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("{:?}", e);
-                let v = Vec::<(String, TaskServer)>::new();
-                v
+    pub fn refresh_data(&mut self) {
+        GLOBAL_TASKS_LIST.clear();
+        GLOBAL_RUNTIME.block_on(async move {
+            let reps = match list_all_tasks().await {
+                Ok(r) => r,
+                Err(e) => {
+                    log::error!("{:?}", e);
+                    return;
+                }
+            };
+            let tasks = match reps.data {
+                Some(v) => v,
+                None => return,
+            };
+
+            // let mut builder = Builder::default();
+            for resp_task in tasks {
+                let status = match task_status(&TaskId {
+                    task_id: resp_task.task.task_id(),
+                })
+                .await
+                {
+                    Ok(t_s) => match t_s.data {
+                        Some(s) => s.status.to_string(),
+                        None => "stopped".to_string(),
+                    },
+                    Err(e) => {
+                        log::error!("{:?}", e);
+                        "stopped".to_string()
+                    }
+                };
+                let task_row = TaskRow {
+                    id: resp_task.task.task_id(),
+                    name: resp_task.task.task_name(),
+                    task_type: resp_task.task.task_type().to_string(),
+                    status,
+                };
+                GLOBAL_TASKS_LIST.insert(resp_task.task.task_id(), task_row);
             }
-        };
-        GLOBAL_SERVER_TABLE_DATA.clear();
+        });
         let mut id_len = 2;
         let mut name_len = 0;
-        let mut url_len = 0;
+        let mut type_len = 0;
+        let mut status_len = 0;
 
-        for (id, task_server) in vec_taskserver {
-            GLOBAL_SERVER_TABLE_DATA.insert(id, task_server);
-        }
-        GLOBAL_SERVER_TABLE_DATA.shrink_to_fit();
+        // for (id, task_server) in vec_taskserver {
+        //     GLOBAL_TASKS_LIST.insert(id, task_server);
+        // }
+        GLOBAL_TASKS_LIST.shrink_to_fit();
 
-        let data_iter = GLOBAL_SERVER_TABLE_DATA.iter();
+        let data_iter = GLOBAL_TASKS_LIST.iter();
 
-        self.server_ids = data_iter
+        self.task_ids = data_iter
             .map(|data| {
                 if UnicodeWidthStr::width(data.key().as_str()).gt(&id_len) {
                     id_len = UnicodeWidthStr::width(data.key().as_str())
@@ -145,8 +176,12 @@ impl TaskTab {
                     name_len = UnicodeWidthStr::width(data.value().name.as_str())
                 }
 
-                if UnicodeWidthStr::width(data.value().url.as_str()).gt(&url_len) {
-                    url_len = UnicodeWidthStr::width(data.value().url.as_str())
+                if UnicodeWidthStr::width(data.value().task_type.as_str()).gt(&type_len) {
+                    type_len = UnicodeWidthStr::width(data.value().task_type.as_str())
+                }
+
+                if UnicodeWidthStr::width(data.value().status.as_str()).gt(&type_len) {
+                    status_len = UnicodeWidthStr::width(data.value().status.as_str())
                 }
                 data.key().to_string()
             })
@@ -155,8 +190,9 @@ impl TaskTab {
         // self.server_ids = vec_ids;
         let id_len_u16 = id_len.try_into().unwrap();
         let name_len_u16 = name_len.try_into().unwrap();
-        let url_len_u16 = url_len.try_into().unwrap();
-        self.longest_item_lens = (id_len_u16, name_len_u16, url_len_u16)
+        let type_len_u16 = type_len.try_into().unwrap();
+        let status_len = status_len.try_into().unwrap();
+        self.longest_item_lens = (id_len_u16, name_len_u16, type_len_u16, status_len)
     }
 }
 
@@ -175,11 +211,11 @@ impl Widget for TaskTab {
             ..area
         };
         render_scrollbar(self.row_index, scrollbar_area, buf);
-        render_server_table(&self, area, buf);
+        render_task_table(&self, area, buf);
     }
 }
 
-fn render_server_table(server_tab: &TaskTab, area: Rect, buf: &mut Buffer) {
+fn render_task_table(server_tab: &TaskTab, area: Rect, buf: &mut Buffer) {
     let mut state = TableState::default().with_selected(Some(server_tab.row_index));
     // let rows = INGREDIENTS.iter().copied();
     // let theme = THEME.recipe;
@@ -198,7 +234,7 @@ fn render_server_table(server_tab: &TaskTab, area: Rect, buf: &mut Buffer) {
         .style(header_style)
         .height(1);
 
-    let data_iter = GLOBAL_SERVER_TABLE_DATA.iter();
+    let data_iter = GLOBAL_TASKS_LIST.iter();
     let rows = data_iter.enumerate().map(|(i, data)| {
         let color = match i % 2 {
             0 => server_tab.colors.normal_row_color,
@@ -208,7 +244,8 @@ fn render_server_table(server_tab: &TaskTab, area: Rect, buf: &mut Buffer) {
         let item = vec![
             data.key().to_string(),
             data.value().name.clone(),
-            data.value().url.clone(),
+            data.value().task_type.clone(),
+            data.value().status.clone(),
         ];
         item.into_iter()
             .map(|content| Cell::from(Text::from(format!("\n{content}\n"))))
@@ -225,6 +262,7 @@ fn render_server_table(server_tab: &TaskTab, area: Rect, buf: &mut Buffer) {
             Constraint::Length(server_tab.longest_item_lens.0 + 1),
             Constraint::Min(server_tab.longest_item_lens.1 + 1),
             Constraint::Min(server_tab.longest_item_lens.2),
+            Constraint::Min(server_tab.longest_item_lens.3),
         ],
     )
     .header(header)
@@ -242,7 +280,7 @@ fn render_server_table(server_tab: &TaskTab, area: Rect, buf: &mut Buffer) {
 
 fn render_scrollbar(position: usize, area: Rect, buf: &mut Buffer) {
     let mut state = ScrollbarState::default()
-        .content_length(GLOBAL_SERVER_TABLE_DATA.len())
+        .content_length(GLOBAL_TASKS_LIST.len())
         .viewport_content_length(6)
         .position(position);
     Scrollbar::new(ScrollbarOrientation::VerticalRight)
@@ -251,64 +289,4 @@ fn render_scrollbar(position: usize, area: Rect, buf: &mut Buffer) {
         .track_symbol(None)
         .thumb_symbol("▐")
         .render(area, buf, &mut state);
-}
-
-pub fn new_server_pop_ui(f: &mut Frame, pop: &NewServerPop) {
-    let input_area = centered_rect(60, 30, f.size());
-    let vertical = Layout::vertical([
-        Constraint::Percentage(20),
-        Constraint::Percentage(30),
-        Constraint::Percentage(30),
-        Constraint::Percentage(20),
-    ]);
-    let [help_area, name_area, url_area, allert_area] = vertical.areas(input_area);
-    f.render_widget(Clear, input_area);
-
-    let help = Text::from("input name and url,pass 'Enter' key to add server").centered();
-    f.render_widget(help, help_area);
-    let input_name = Paragraph::new(pop.input_name.as_str())
-        .style(Style::default().fg(Color::Yellow))
-        .block(Block::bordered().title_top(Line::from("Name").right_aligned()));
-    f.render_widget(input_name, name_area);
-
-    let input_url = Paragraph::new(pop.input_url.as_str())
-        .style(Style::default().fg(Color::Yellow))
-        .block(Block::bordered().title_top(Line::from("Url").right_aligned()));
-    f.render_widget(input_url, url_area);
-
-    match pop.selected_input {
-        SelectedInput::Name => {
-            f.set_cursor(
-                // Draw the cursor at the current position in the input field.
-                // This position is can be controlled via the left and right arrow key
-                // name_area.x + pop.name_char_index as u16 + 1,
-                name_area.x + pop.name_cursor_index as u16 + 1,
-                // Move one line down, from the border to the input line
-                name_area.y + 1,
-            );
-        }
-        SelectedInput::Url => {
-            f.set_cursor(url_area.x + pop.url_cursor_index as u16 + 1, url_area.y + 1);
-        }
-    }
-
-    // let message_block = Block::new().borders(Borders::NONE);
-    let alert_msg = Text::from(pop.alert_msg.as_str()).centered();
-    f.render_widget(alert_msg, allert_area);
-}
-
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ])
-    .split(r);
-
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ])
-    .split(popup_layout[1])[1]
 }
