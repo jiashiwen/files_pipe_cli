@@ -1,5 +1,3 @@
-use std::{sync::Arc, time::Duration};
-
 use color_eyre::{eyre::Context, Result};
 use itertools::Itertools;
 use ratatui::{
@@ -12,6 +10,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Tabs, Widget},
 };
+use std::time::Duration;
 use strum::{Display, EnumCount, EnumIter, FromRepr, IntoEnumIterator};
 
 use super::{
@@ -46,21 +45,21 @@ enum Tab {
     #[default]
     About,
     ServerTab,
-    Recipe,
-    Email,
-    Traceroute,
-    Weather,
+    // Recipe,
+    // Email,
+    // Traceroute,
+    // Weather,
 }
 
 impl Tab {
     pub fn to_string(&self) -> String {
         match self {
             Tab::About => "About".to_string(),
-            Tab::Recipe => "Recipe".to_string(),
-            Tab::Email => "Email".to_string(),
-            Tab::Traceroute => "Traceroute".to_string(),
-            Tab::Weather => "Weather".to_string(),
             Tab::ServerTab => "ServerTab".to_string(),
+            // Tab::Recipe => "Recipe".to_string(),
+            // Tab::Email => "Email".to_string(),
+            // Tab::Traceroute => "Traceroute".to_string(),
+            // Tab::Weather => "Weather".to_string(),
         }
     }
 }
@@ -111,14 +110,20 @@ impl App {
 
     fn handle_key_press(&mut self, key: KeyEvent) {
         match self.tab {
-            Tab::About | Tab::Recipe | Tab::Email | Tab::Traceroute | Tab::Weather => {
-                match key.code {
-                    KeyCode::Char('k') | KeyCode::Up => self.prev(),
-                    KeyCode::Char('j') | KeyCode::Down => self.next(),
-                    KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
-                    _ => {}
-                }
-            }
+            // Tab::About | Tab::Recipe | Tab::Email | Tab::Traceroute | Tab::Weather => {
+            //     match key.code {
+            //         KeyCode::Char('k') | KeyCode::Up => self.prev(),
+            //         KeyCode::Char('j') | KeyCode::Down => self.next(),
+            //         KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
+            //         _ => {}
+            //     }
+            // }
+            Tab::About => match key.code {
+                KeyCode::Char('k') | KeyCode::Up => self.prev(),
+                KeyCode::Char('j') | KeyCode::Down => self.next(),
+                KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
+                _ => {}
+            },
 
             Tab::ServerTab => {
                 self.server_tab.flush_data();
@@ -168,10 +173,10 @@ impl App {
     fn prev(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.prev_row(),
-            Tab::Recipe => self.recipe_tab.prev(),
-            Tab::Email => self.email_tab.prev(),
-            Tab::Traceroute => self.traceroute_tab.prev_row(),
-            Tab::Weather => self.weather_tab.prev(),
+            // Tab::Recipe => self.recipe_tab.prev(),
+            // Tab::Email => self.email_tab.prev(),
+            // Tab::Traceroute => self.traceroute_tab.prev_row(),
+            // Tab::Weather => self.weather_tab.prev(),
             _ => {}
         }
     }
@@ -179,10 +184,10 @@ impl App {
     fn next(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.next_row(),
-            Tab::Recipe => self.recipe_tab.next(),
-            Tab::Email => self.email_tab.next(),
-            Tab::Traceroute => self.traceroute_tab.next_row(),
-            Tab::Weather => self.weather_tab.next(),
+            // Tab::Recipe => self.recipe_tab.next(),
+            // Tab::Email => self.email_tab.next(),
+            // Tab::Traceroute => self.traceroute_tab.next_row(),
+            // Tab::Weather => self.weather_tab.next(),
             _ => {}
         }
     }
@@ -246,11 +251,10 @@ impl App {
                 let mut tab = self.server_tab.clone();
                 tab.flush_data();
                 tab.render(area, buf);
-            }
-            Tab::Recipe => self.recipe_tab.render(area, buf),
-            Tab::Email => self.email_tab.render(area, buf),
-            Tab::Traceroute => self.traceroute_tab.render(area, buf),
-            Tab::Weather => self.weather_tab.render(area, buf),
+            } // Tab::Recipe => self.recipe_tab.render(area, buf),
+              // Tab::Email => self.email_tab.render(area, buf),
+              // Tab::Traceroute => self.traceroute_tab.render(area, buf),
+              // Tab::Weather => self.weather_tab.render(area, buf),
         };
     }
 
