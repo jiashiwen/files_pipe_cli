@@ -1,5 +1,5 @@
 use super::{
-    pops::{PopTaskEditor, GLOBAL_TASK_EDITOR},
+    pops::{PopNewServer, PopTaskEditor, GLOBAL_TASK_EDITOR},
     tabs::{
         new_server_pop_ui, AboutTab, EmailTab, RecipeTab, ServerTab, TaskTab, TracerouteTab,
         WeatherTab,
@@ -21,6 +21,7 @@ use ratatui::{
 };
 use std::time::Duration;
 use strum::{Display, EnumCount, EnumIter, FromRepr, IntoEnumIterator};
+use tui_textarea::TextArea;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct App {
@@ -34,6 +35,7 @@ pub struct App {
     traceroute_tab: TracerouteTab,
     weather_tab: WeatherTab,
     pop_task_editor: PopTaskEditor,
+    pop_new_server: PopNewServer,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -81,12 +83,8 @@ impl App {
             .draw(|frame| {
                 frame.render_widget(self, frame.size());
                 // app_ui(frame, self);
-                if self.server_tab.new_server.show {
-                    new_server_pop_ui(frame, &self.server_tab.new_server)
-                }
-                // if GLOBAL_TASK_EDITOR.read().unwrap().show {
-                //     let editor = GLOBAL_TASK_EDITOR.read().unwrap();
-                //     pop_task_editor_ui(frame, &editor);
+                // if self.server_tab.new_server.show {
+                //     new_server_pop_ui(frame, &self.server_tab.new_server)
                 // }
             })
             .wrap_err("terminal.draw")?;
@@ -116,37 +114,47 @@ impl App {
             },
             Tab::ServerTab => {
                 self.server_tab.refresh_data();
-                if self.server_tab.new_server.show {
+                if self.pop_new_server.show {
                     match key.code {
-                        KeyCode::Char('n') => self.server_tab.new_server(),
                         KeyCode::Esc => {
-                            self.server_tab.new_server.show = false;
-                            self.server_tab.new_server.clear();
+                            self.pop_new_server.show = false;
                         }
-                        KeyCode::Tab => self.server_tab.new_server.select_input(),
-                        KeyCode::Enter => self.server_tab.new_server.add_server(),
-                        KeyCode::Char(to_insert) => {
-                            self.server_tab.new_server.enter_char(to_insert);
-                        }
-                        KeyCode::Backspace => {
-                            self.server_tab.new_server.delete_char();
-                        }
-                        KeyCode::Left => {
-                            self.server_tab.new_server.move_cursor_left();
-                        }
-                        KeyCode::Right => {
-                            self.server_tab.new_server.move_cursor_right();
-                        }
-
-                        _ => {}
+                        _ => self.pop_new_server.input(key),
                     }
                     return;
                 }
+                // if self.server_tab.new_server.show {
+                //     match key.code {
+                //         KeyCode::Char('n') => self.server_tab.new_server(),
+                //         KeyCode::Esc => {
+                //             self.server_tab.new_server.show = false;
+                //             self.server_tab.new_server.clear();
+                //         }
+                //         KeyCode::Tab => self.server_tab.new_server.select_input(),
+                //         KeyCode::Enter => self.server_tab.new_server.add_server(),
+                //         KeyCode::Char(to_insert) => {
+                //             self.server_tab.new_server.enter_char(to_insert);
+                //         }
+                //         KeyCode::Backspace => {
+                //             self.server_tab.new_server.delete_char();
+                //         }
+                //         KeyCode::Left => {
+                //             self.server_tab.new_server.move_cursor_left();
+                //         }
+                //         KeyCode::Right => {
+                //             self.server_tab.new_server.move_cursor_right();
+                //         }
+
+                //         _ => {}
+                //     }
+                //     return;
+                // }
                 match key.code {
                     KeyCode::Char('k') | KeyCode::Up => self.server_tab.prev(),
                     KeyCode::Char('j') | KeyCode::Down => self.server_tab.next(),
-                    KeyCode::Char('n') => self.server_tab.new_server(),
-                    KeyCode::Char('d') => self.server_tab.delete_server(),
+                    KeyCode::Char('n') => self.pop_new_server.show_pop(),
+                    // KeyCode::Char('n') => self.server_tab.new_server(),
+                    // KeyCode::Char('d') => self.server_tab.delete_server(),
                     _ => {}
                 }
             }
@@ -154,8 +162,13 @@ impl App {
             Tab::TaskTab => {
                 if self.pop_task_editor.show {
                     match key.code {
+                        KeyCode::F(10) => {
+                            log::info!("control");
+                        }
                         KeyCode::Esc => {
                             self.pop_task_editor.show = false;
+                            let mut editor = GLOBAL_TASK_EDITOR.write().unwrap();
+                            *editor = TextArea::default();
                             return;
                         }
                         _ => {
@@ -237,32 +250,18 @@ impl Widget for &App {
         self.render_title_bar(title_bar, buf);
         self.clone().render_selected_tab(tab, buf);
         App::render_bottom_bar(bottom_bar, buf);
+
         if self.pop_task_editor.show {
             self.pop_task_editor.clone().render(area, buf);
+        }
+
+        if self.pop_new_server.show {
+            self.pop_new_server.clone().render(area, buf);
         }
     }
 }
 
 impl App {
-    // fn render(self, area: Rect, buf: &mut Buffer) {
-    //     let vertical = Layout::vertical([
-    //         Constraint::Length(1),
-    //         Constraint::Min(0),
-    //         Constraint::Length(1),
-    //     ]);
-    //     let [title_bar, tab, bottom_bar] = vertical.areas(area);
-
-    //     Block::new().style(THEME.root).render(area, buf);
-    //     self.render_title_bar(title_bar, buf);
-    //     self.clone().render_selected_tab(tab, buf);
-    // GLOBAL_TASK_EDITOR
-    //     //     .read()
-    //     //     .unwrap()
-    //     //     .editor
-    //     //     .widget()
-    //     //     .render(area, buf);
-    //     App::render_bottom_bar(bottom_bar, buf);
-    // }
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(43)]);
         let [title, tabs] = layout.areas(area);
@@ -304,7 +303,6 @@ impl App {
             }
             Tab::TaskTab => {
                 let tab = self.task_tab.clone();
-
                 tab.render(area, buf)
             } // Tab::Recipe => self.recipe_tab.render(area, buf),
               // Tab::Email => self.email_tab.render(area, buf),

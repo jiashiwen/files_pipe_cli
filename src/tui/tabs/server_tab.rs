@@ -15,10 +15,7 @@ use ratatui::{
     },
     Frame,
 };
-use std::{
-    ops::Sub,
-    sync::{mpsc::Sender, Arc},
-};
+use std::{ops::Sub, sync::Arc};
 use strum::{EnumCount, EnumIter, FromRepr};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -319,8 +316,7 @@ pub struct ServerTab {
     colors: TableColors,
     color_index: usize,
     longest_item_lens: (u16, u16, u16),
-    pub new_server: NewServerPop,
-    // sender: Arc<Sender<String>>,
+    // pub new_server: NewServerPop,
 }
 
 impl ServerTab {
@@ -349,9 +345,9 @@ impl ServerTab {
         };
     }
 
-    pub fn new_server(&mut self) {
-        self.new_server.show = !self.new_server.show;
-    }
+    // pub fn new_server(&mut self) {
+    //     self.new_server.show = !self.new_server.show;
+    // }
 
     pub fn delete_server(&mut self) {
         match self.server_ids.get(self.row_index) {
