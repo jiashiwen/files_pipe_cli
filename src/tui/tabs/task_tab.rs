@@ -16,7 +16,10 @@ use ratatui::{
     },
     Frame,
 };
-use std::{ops::Sub, sync::Arc};
+use std::{
+    ops::Sub,
+    sync::{mpsc, Arc},
+};
 use strum::{EnumCount, EnumIter, FromRepr};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -153,16 +156,13 @@ impl TaskTab {
                 };
                 GLOBAL_TASKS_LIST.insert(resp_task.task.task_id(), task_row);
             }
+            GLOBAL_TASKS_LIST.shrink_to_fit();
         });
+
         let mut id_len = 2;
         let mut name_len = 0;
         let mut type_len = 0;
         let mut status_len = 0;
-
-        // for (id, task_server) in vec_taskserver {
-        //     GLOBAL_TASKS_LIST.insert(id, task_server);
-        // }
-        GLOBAL_TASKS_LIST.shrink_to_fit();
 
         let data_iter = GLOBAL_TASKS_LIST.iter();
 
@@ -227,7 +227,7 @@ fn render_task_table(server_tab: &TaskTab, area: Rect, buf: &mut Buffer) {
         .add_modifier(Modifier::REVERSED)
         .fg(server_tab.colors.selected_style_fg);
 
-    let header = ["Id", "Name", "Url"]
+    let header = ["Id", "Name", "Type", "Status"]
         .into_iter()
         .map(Cell::from)
         .collect::<Row>()

@@ -8,14 +8,17 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Margin, Rect},
     style::{palette::tailwind, Color, Modifier, Style, Stylize},
-    text::{Line, Span, Text},
+    text::{Line, Text},
     widgets::{
-        Block, Borders, Cell, Clear, HighlightSpacing, List, ListItem, Paragraph, Row, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Widget,
+        Block, Cell, Clear, HighlightSpacing, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, StatefulWidget, Table, TableState, Widget,
     },
     Frame,
 };
-use std::{ops::Sub, sync::Arc};
+use std::{
+    ops::Sub,
+    sync::{mpsc::Sender, Arc},
+};
 use strum::{EnumCount, EnumIter, FromRepr};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -317,6 +320,7 @@ pub struct ServerTab {
     color_index: usize,
     longest_item_lens: (u16, u16, u16),
     pub new_server: NewServerPop,
+    // sender: Arc<Sender<String>>,
 }
 
 impl ServerTab {
