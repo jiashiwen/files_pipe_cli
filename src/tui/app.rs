@@ -116,44 +116,21 @@ impl App {
                         KeyCode::Esc => {
                             self.pop_new_server.show = false;
                         }
-                        KeyCode::Enter => self.pop_new_server.add_server(),
+                        KeyCode::Enter => {
+                            self.pop_new_server.add_server();
+                            self.server_tab.refresh_data();
+                        }
                         KeyCode::Tab => self.pop_new_server.select_input(),
                         _ => self.pop_new_server.input(key),
                     }
                     return;
                 }
-                // if self.server_tab.new_server.show {
-                //     match key.code {
-                //         KeyCode::Char('n') => self.server_tab.new_server(),
-                //         KeyCode::Esc => {
-                //             self.server_tab.new_server.show = false;
-                //             self.server_tab.new_server.clear();
-                //         }
-                //         KeyCode::Tab => self.server_tab.new_server.select_input(),
-                //         KeyCode::Enter => self.server_tab.new_server.add_server(),
-                //         KeyCode::Char(to_insert) => {
-                //             self.server_tab.new_server.enter_char(to_insert);
-                //         }
-                //         KeyCode::Backspace => {
-                //             self.server_tab.new_server.delete_char();
-                //         }
-                //         KeyCode::Left => {
-                //             self.server_tab.new_server.move_cursor_left();
-                //         }
-                //         KeyCode::Right => {
-                //             self.server_tab.new_server.move_cursor_right();
-                //         }
 
-                //         _ => {}
-                //     }
-                //     return;
-                // }
                 match key.code {
                     KeyCode::Char('k') | KeyCode::Up => self.server_tab.prev(),
                     KeyCode::Char('j') | KeyCode::Down => self.server_tab.next(),
                     KeyCode::Char('n') => self.pop_new_server.show_pop(),
-                    // KeyCode::Char('n') => self.server_tab.new_server(),
-                    // KeyCode::Char('d') => self.server_tab.delete_server(),
+                    KeyCode::Char('d') => self.server_tab.delete_server(),
                     _ => {}
                 }
             }
@@ -197,10 +174,6 @@ impl App {
     fn prev(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.prev_row(),
-            // Tab::Recipe => self.recipe_tab.prev(),
-            // Tab::Email => self.email_tab.prev(),
-            // Tab::Traceroute => self.traceroute_tab.prev_row(),
-            // Tab::Weather => self.weather_tab.prev(),
             _ => {}
         }
     }
@@ -208,10 +181,7 @@ impl App {
     fn next(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.next_row(),
-            // Tab::Recipe => self.recipe_tab.next(),
-            // Tab::Email => self.email_tab.next(),
-            // Tab::Traceroute => self.traceroute_tab.next_row(),
-            // Tab::Weather => self.weather_tab.next(),
+
             _ => {}
         }
     }
@@ -227,10 +197,6 @@ impl App {
     fn destroy(&mut self) {
         self.mode = Mode::Destroy;
     }
-
-    // pub fn show_popup(&self) -> bool {
-    //     self.pop.show_popup.clone()
-    // }
 }
 
 /// Implement Widget for &App rather than for App as we would otherwise have to clone or copy the
@@ -276,23 +242,6 @@ impl App {
             .render(tabs, buf);
     }
 
-    fn render_title_bar_ui(&self, f: &mut Frame, area: Rect) {
-        let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(43)]);
-        let [title, tabs_area] = layout.areas(area);
-
-        // Span::styled("Mario UI", THEME.app_title).render(title, buf);
-        f.render_widget(Span::styled("Mario UI", THEME.app_title), title);
-        let titles = Tab::iter().map(Tab::title);
-        let tabs = Tabs::new(titles)
-            .style(THEME.tabs)
-            .highlight_style(THEME.tabs_selected)
-            .select(self.tab as usize)
-            .divider("")
-            .padding("", "");
-        // .render(tabs, buf);
-        f.render_widget(tabs, tabs_area)
-    }
-
     fn render_selected_tab(self, area: Rect, buf: &mut Buffer) {
         match self.tab {
             Tab::About => self.about_tab.render(area, buf),
@@ -303,10 +252,7 @@ impl App {
             Tab::TaskTab => {
                 let tab = self.task_tab.clone();
                 tab.render(area, buf)
-            } // Tab::Recipe => self.recipe_tab.render(area, buf),
-              // Tab::Email => self.email_tab.render(area, buf),
-              // Tab::Traceroute => self.traceroute_tab.render(area, buf),
-              // Tab::Weather => self.weather_tab.render(area, buf),
+            }
         };
     }
 
@@ -358,61 +304,4 @@ impl Tab {
             tab => format!(" {tab} "),
         }
     }
-}
-
-pub fn bottom_ui(f: &mut Frame, area: Rect) {
-    let keys = [
-        ("H/←", "Left"),
-        ("L/→", "Right"),
-        ("K/↑", "Up"),
-        ("J/↓", "Down"),
-        ("D/Del", "Destroy"),
-        ("Q/Esc", "Quit"),
-    ];
-    let spans = keys
-        .iter()
-        .flat_map(|(key, desc)| {
-            let key = Span::styled(format!(" {key} "), THEME.key_binding.key);
-            let desc = Span::styled(format!(" {desc} "), THEME.key_binding.description);
-            [key, desc]
-        })
-        .collect_vec();
-    let line = Line::from(spans)
-        .centered()
-        .style((Color::Indexed(236), Color::Indexed(232)));
-    f.render_widget(line, area);
-}
-
-pub fn app_ui(f: &mut Frame, app: &App) {
-    let vertical = Layout::vertical([
-        Constraint::Length(1),
-        Constraint::Min(0),
-        Constraint::Length(1),
-    ]);
-    let [title_bar, tab, bottom_bar] = vertical.areas(f.size());
-
-    app.render_title_bar_ui(f, title_bar);
-    match app.tab {
-        Tab::About => f.render_widget(app.about_tab, tab),
-        Tab::ServerTab => {
-            let mut server_tab = app.server_tab.clone();
-            // server_tab.refresh_data();
-            f.render_widget(server_tab, tab)
-        }
-        Tab::TaskTab => {
-            let mut task_tab = app.task_tab.clone();
-            // task_tab.refresh_data();
-            f.render_widget(task_tab, tab)
-        }
-    };
-
-    // f.render_widget(bottom_bar_wiget, bottom_bar);
-    bottom_ui(f, bottom_bar)
-    // GLOBAL_TASK_EDITOR
-    //     .read()
-    //     .unwrap()
-    //     .editor
-    //     .widget()
-    //     .render(area, buf);
-    // App::render_bottom_bar(bottom_bar, buf);
 }

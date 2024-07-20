@@ -102,16 +102,6 @@ impl TaskTab {
         };
     }
 
-    pub fn delete_server(&mut self) {
-        match self.task_ids.get(self.row_index) {
-            Some(id) => {
-                let _ = remove_server_from_cf(id);
-                self.refresh_data();
-            }
-            None => {}
-        };
-    }
-
     pub fn set_colors(&mut self) {
         self.colors = TableColors::new(&PALETTES[self.color_index]);
     }
@@ -186,7 +176,6 @@ impl TaskTab {
             })
             .collect::<Vec<String>>();
 
-        // self.server_ids = vec_ids;
         let id_len_u16 = id_len.try_into().unwrap();
         let name_len_u16 = name_len.try_into().unwrap();
         let type_len_u16 = type_len.try_into().unwrap();

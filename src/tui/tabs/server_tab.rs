@@ -345,10 +345,6 @@ impl ServerTab {
         };
     }
 
-    // pub fn new_server(&mut self) {
-    //     self.new_server.show = !self.new_server.show;
-    // }
-
     pub fn delete_server(&mut self) {
         match self.server_ids.get(self.row_index) {
             Some(id) => {
@@ -401,7 +397,6 @@ impl ServerTab {
             })
             .collect::<Vec<String>>();
 
-        // self.server_ids = vec_ids;
         let id_len_u16 = id_len.try_into().unwrap();
         let name_len_u16 = name_len.try_into().unwrap();
         let url_len_u16 = url_len.try_into().unwrap();

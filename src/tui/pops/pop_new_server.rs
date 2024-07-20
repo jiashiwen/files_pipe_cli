@@ -63,6 +63,7 @@ impl PopNewServer {
     pub fn clear(&mut self) {
         let mut ns = GLOBAL_NEWSERVER_TEXT_AREA.write().unwrap();
         *ns = NewServerTextArea::default();
+        self.selected_input = SelectedInput::default();
     }
 
     pub fn select_input(&mut self) {
@@ -196,17 +197,3 @@ pub enum SelectedInput {
     Name,
     Url,
 }
-
-// impl PopNewServer {
-//     pub fn clear(&mut self) {}
-//     pub fn select_input(&mut self) {
-//         let current_index = self.selected_input as usize;
-//         let mut next_index = current_index.saturating_add(1);
-//         let count = SelectedInput::COUNT;
-//         if next_index.eq(&count) {
-//             next_index = 0;
-//         }
-//         self.selected_input =
-//             SelectedInput::from_repr(next_index).unwrap_or(SelectedInput::default());
-//     }
-// }
