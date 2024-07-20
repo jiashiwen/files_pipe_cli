@@ -1,7 +1,6 @@
 use crate::{
-    request::{list_all_tasks, task_status, TaskId, TaskServer, GLOBAL_RUNTIME},
-    resources::{list_servers_from_cf, remove_server_from_cf, save_task_server_to_cf},
-    tui::pops::PopTaskEditor,
+    request::{list_all_tasks, task_status, TaskId, GLOBAL_RUNTIME},
+    resources::remove_server_from_cf,
 };
 use dashmap::DashMap;
 use once_cell::sync::Lazy;

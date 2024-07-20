@@ -1,9 +1,6 @@
 use super::{
     pops::{PopNewServer, PopTaskEditor, GLOBAL_TASK_EDITOR},
-    tabs::{
-        new_server_pop_ui, AboutTab, EmailTab, RecipeTab, ServerTab, TaskTab, TracerouteTab,
-        WeatherTab,
-    },
+    tabs::{AboutTab, EmailTab, RecipeTab, ServerTab, TaskTab, TracerouteTab, WeatherTab},
     term, THEME,
 };
 use color_eyre::{eyre::Context, Result};
@@ -119,6 +116,8 @@ impl App {
                         KeyCode::Esc => {
                             self.pop_new_server.show = false;
                         }
+                        KeyCode::Enter => self.pop_new_server.add_server(),
+                        KeyCode::Tab => self.pop_new_server.select_input(),
                         _ => self.pop_new_server.input(key),
                     }
                     return;
