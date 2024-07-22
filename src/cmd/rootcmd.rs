@@ -178,7 +178,7 @@ fn cmd_match(matches: &ArgMatches) {
     if let Some(server) = matches.subcommand_matches("server") {
         if let Some(_) = server.subcommand_matches("current") {
             GLOBAL_RUNTIME.block_on(async move {
-                println!("{:?}", GLOBAL_CURRENT_SERVER.read().await);
+                println!("{:?}", GLOBAL_CURRENT_SERVER.read().unwrap());
             });
         }
 
@@ -209,9 +209,10 @@ fn cmd_match(matches: &ArgMatches) {
         if let Some(set) = server.subcommand_matches("set") {
             if let Some(id) = set.get_one::<String>("server_id") {
                 let server_id = id.to_string();
-                GLOBAL_RUNTIME.block_on(async move {
-                    println!("{:?}", set_current_server(&server_id).await);
-                });
+                println!("{:?}", set_current_server(&server_id));
+                // GLOBAL_RUNTIME.block_on(async move {
+                //     println!("{:?}", set_current_server(&server_id).await);
+                // });
             }
         }
 

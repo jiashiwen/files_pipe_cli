@@ -13,7 +13,7 @@ pub const API_TEMPLATE_TRANSFER_LOCAL2LOCAL: &'static str =
 pub async fn template_transfer_oss2oss() -> Result<Response<Task>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TEMPLATE_TRANSFER_OSS2OSS);
@@ -30,7 +30,7 @@ pub async fn template_transfer_oss2oss() -> Result<Response<Task>> {
 pub async fn template_transfer_local2oss() -> Result<Response<Task>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TEMPLATE_TRANSFER_LOCAL2OSS);
@@ -47,7 +47,7 @@ pub async fn template_transfer_local2oss() -> Result<Response<Task>> {
 pub async fn template_transfer_oss2local() -> Result<Response<Task>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TEMPLATE_TRANSFER_OSS2LOCAL);
@@ -64,7 +64,7 @@ pub async fn template_transfer_oss2local() -> Result<Response<Task>> {
 pub async fn template_transfer_local2local() -> Result<Response<Task>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TEMPLATE_TRANSFER_LOCAL2LOCAL);

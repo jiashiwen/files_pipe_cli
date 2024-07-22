@@ -71,7 +71,6 @@ impl TaskStopReason {
 pub enum Task {
     Transfer(TransferTask),
     Compare(CompareTask),
-    // TruncateBucket(TaskTruncateBucket),
 }
 
 impl Task {

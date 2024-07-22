@@ -2,14 +2,26 @@ use anyhow::Result;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::runtime::{self, Runtime};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub struct TaskServer {
     pub name: String,
     pub url: String,
+}
+
+impl TaskServer {
+    pub fn set_default(&self) -> Self {
+        Self::default()
+    }
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
+    }
+    pub fn set_url(&mut self, url: &str) {
+        self.url = url.to_string();
+    }
 }
 
 impl Default for TaskServer {
@@ -30,7 +42,11 @@ pub static GLOBAL_RUNTIME: Lazy<Arc<Runtime>> = Lazy::new(|| {
 });
 
 pub static GLOBAL_HTTP_CLIENT: Lazy<Arc<Client>> = Lazy::new(|| {
-    let client = reqwest::Client::new();
+    // let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
     Arc::new(client)
 });
 

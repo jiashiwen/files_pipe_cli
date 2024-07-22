@@ -1,26 +1,22 @@
 use crate::{
-    request::{list_all_tasks, task_status, TaskId, GLOBAL_RUNTIME},
-    resources::remove_server_from_cf,
+    commons::struct_to_json_string_prettry,
+    request::{list_all_tasks, task_show, task_status, Task, TaskId, GLOBAL_RUNTIME},
 };
+use anyhow::Result;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Margin, Rect},
+    layout::{Constraint, Margin, Rect},
     style::{palette::tailwind, Color, Modifier, Style, Stylize},
-    text::{Line, Span, Text},
+    text::Text,
     widgets::{
-        Block, Borders, Cell, Clear, HighlightSpacing, List, ListItem, Paragraph, Row, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, StatefulWidget, Table, TableState, Widget,
+        Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        StatefulWidget, Table, TableState, Widget,
     },
-    Frame,
 };
-use std::{
-    ops::Sub,
-    sync::{mpsc, Arc},
-};
-use strum::{EnumCount, EnumIter, FromRepr};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use std::sync::Arc;
+use unicode_width::UnicodeWidthStr;
 
 // use crate::{RgbSwatch, THEME};
 
@@ -104,6 +100,41 @@ impl TaskTab {
 
     pub fn set_colors(&mut self) {
         self.colors = TableColors::new(&PALETTES[self.color_index]);
+    }
+
+    // Todo 设置事件，进行测试
+    pub fn get_task(&mut self) -> String {
+        let task_id = self.task_ids.get(self.row_index).unwrap().to_string();
+        let mut task_json = Arc::new("".to_string());
+        let mut t_j = Arc::get_mut(&mut task_json).unwrap();
+        GLOBAL_RUNTIME.block_on(async move {
+            let id = TaskId { task_id };
+            let resp_task = match task_show(&id).await {
+                Ok(t) => t,
+                Err(e) => {
+                    log::error!("{:?}", e);
+                    return;
+                }
+            };
+
+            let t = match resp_task.data {
+                Some(t) => t,
+                None => {
+                    return;
+                }
+            };
+
+            let task_json = match struct_to_json_string_prettry(&t) {
+                Ok(j) => j,
+                Err(e) => {
+                    log::error!("{:?}", e);
+                    return;
+                }
+            };
+
+            t_j.push_str(&task_json);
+        });
+        task_json.to_string()
     }
 
     pub fn refresh_data(&mut self) {

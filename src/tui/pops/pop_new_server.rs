@@ -172,7 +172,7 @@ impl Widget for PopNewServer {
         ]);
         let [help_area, name_area, url_area, alert_area] = vertical.areas(editor_area);
         Clear.render(editor_area, buf);
-        let help = Text::from("add new server,pass 'Enter' key to add server").centered();
+        let help = Text::from("pass 'Enter' key to add server,'ESC' to escape").centered();
         help.render(help_area, buf);
         GLOBAL_NEWSERVER_TEXT_AREA
             .write()

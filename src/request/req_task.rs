@@ -21,7 +21,7 @@ pub const API_TASK_ALL_LIVING: &'static str = "/api/v1/task/all_living";
 pub async fn task_show(id: &TaskId) -> Result<Response<Task>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TASK_SHOW);
@@ -39,7 +39,7 @@ pub async fn task_show(id: &TaskId) -> Result<Response<Task>> {
 pub async fn task_create(task: &Task) -> Result<Response<TaskId>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TASK_CREATE);
@@ -57,7 +57,7 @@ pub async fn task_create(task: &Task) -> Result<Response<TaskId>> {
 pub async fn task_update(task: &ReqTaskUpdate) -> Result<Response<()>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TASK_UPDATE);
@@ -75,7 +75,7 @@ pub async fn task_update(task: &ReqTaskUpdate) -> Result<Response<()>> {
 pub async fn task_start(id: &TaskId) -> Result<Response<()>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(&API_TASK_START);
@@ -93,7 +93,7 @@ pub async fn task_start(id: &TaskId) -> Result<Response<()>> {
 pub async fn task_stop(id: &TaskId) -> Result<Response<Task>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(&API_TASK_STOP);
@@ -111,7 +111,7 @@ pub async fn task_stop(id: &TaskId) -> Result<Response<Task>> {
 pub async fn task_clean(id: &TaskId) -> Result<Response<()>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TASK_CLEAN);
@@ -129,7 +129,7 @@ pub async fn task_clean(id: &TaskId) -> Result<Response<()>> {
 pub async fn task_remove(id: &TaskId) -> Result<Response<()>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TASK_REMOVE);
@@ -147,7 +147,7 @@ pub async fn task_remove(id: &TaskId) -> Result<Response<()>> {
 pub async fn task_status(id: &TaskId) -> Result<Response<TaskStatus>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TASK_STATUS);
@@ -165,7 +165,7 @@ pub async fn task_status(id: &TaskId) -> Result<Response<TaskStatus>> {
 pub async fn list_all_tasks() -> Result<Response<Vec<RespListTask>>> {
     let mut url = GLOBAL_CURRENT_SERVER
         .read()
-        .await
+        .unwrap()
         .url
         .parse::<reqwest::Url>()?;
     url.set_path(API_TASK_ALL);

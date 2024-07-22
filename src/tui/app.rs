@@ -79,10 +79,6 @@ impl App {
         terminal
             .draw(|frame| {
                 frame.render_widget(self, frame.size());
-                // app_ui(frame, self);
-                // if self.server_tab.new_server.show {
-                //     new_server_pop_ui(frame, &self.server_tab.new_server)
-                // }
             })
             .wrap_err("terminal.draw")?;
         Ok(())
@@ -129,7 +125,8 @@ impl App {
                 match key.code {
                     KeyCode::Char('k') | KeyCode::Up => self.server_tab.prev(),
                     KeyCode::Char('j') | KeyCode::Down => self.server_tab.next(),
-                    KeyCode::Char('n') => self.pop_new_server.show_pop(),
+                    KeyCode::Char('a') => self.pop_new_server.show_pop(),
+                    KeyCode::Enter => self.server_tab.set_current_server(),
                     KeyCode::Char('d') => self.server_tab.delete_server(),
                     _ => {}
                 }
@@ -138,11 +135,14 @@ impl App {
             Tab::TaskTab => {
                 if self.pop_task_editor.show {
                     match key.code {
-                        KeyCode::F(10) => {
-                            log::info!("control");
-                        }
                         KeyCode::Esc => {
                             self.pop_task_editor.show = false;
+                            let mut editor = GLOBAL_TASK_EDITOR.write().unwrap();
+                            *editor = TextArea::default();
+                            return;
+                        }
+                        KeyCode::F(10) => {
+                            self.pop_task_editor.create_task("task_id");
                             let mut editor = GLOBAL_TASK_EDITOR.write().unwrap();
                             *editor = TextArea::default();
                             return;
@@ -157,7 +157,11 @@ impl App {
                     KeyCode::Char('k') | KeyCode::Up => self.task_tab.prev(),
                     KeyCode::Char('j') | KeyCode::Down => self.task_tab.next(),
                     KeyCode::Char('f') => self.task_tab.refresh_data(),
-                    KeyCode::Char('e') => self.pop_task_editor.show_editor(),
+                    KeyCode::Char('a') => self.pop_task_editor.show_editor(),
+                    KeyCode::Char('e') => {
+                        // let id=self.task_tab
+                        // self.pop_task_editor.show_editer_with_text()
+                    }
                     _ => {}
                 }
             }
@@ -214,7 +218,43 @@ impl Widget for &App {
         Block::new().style(THEME.root).render(area, buf);
         self.render_title_bar(title_bar, buf);
         self.clone().render_selected_tab(tab, buf);
-        App::render_bottom_bar(bottom_bar, buf);
+
+        let keys = match self.tab {
+            Tab::About => vec![
+                ("TAB".to_string(), "SelectTab".to_string()),
+                ("H/←".to_string(), "Left".to_string()),
+                ("L/→".to_string(), "Right".to_string()),
+                ("K/↑".to_string(), "Up".to_string()),
+                ("J/↓".to_string(), "Down".to_string()),
+                ("D/Del".to_string(), "Destroy".to_string()),
+                ("Q/Esc".to_string(), "Quit".to_string()),
+            ],
+            Tab::ServerTab => {
+                vec![
+                    ("TAB".to_string(), "SelectTab".to_string()),
+                    ("K/↑".to_string(), "Up".to_string()),
+                    ("J/↓".to_string(), "Down".to_string()),
+                    ("A/Add".to_string(), "Add".to_string()),
+                    ("D/Del".to_string(), "Del".to_string()),
+                    ("Enter".to_string(), "Set Server".to_string()),
+                    ("Q/Esc".to_string(), "Quit".to_string()),
+                ]
+            }
+            Tab::TaskTab => vec![
+                ("TAB".to_string(), "SelectTab".to_string()),
+                ("K/↑".to_string(), "Up".to_string()),
+                ("J/↓".to_string(), "Down".to_string()),
+                ("A/Add".to_string(), "Add".to_string()),
+                ("Enter".to_string(), "Show Task".to_string()),
+                ("R".to_string(), "Run Task".to_string()),
+                ("I".to_string(), "Stop Task".to_string()),
+                ("S".to_string(), "Task Status".to_string()),
+                ("D/Del".to_string(), "Del Task".to_string()),
+                ("Q/Esc".to_string(), "Quit".to_string()),
+            ],
+        };
+
+        App::render_bottom_bar(keys, bottom_bar, buf);
 
         if self.pop_task_editor.show {
             self.pop_task_editor.clone().render(area, buf);
@@ -256,16 +296,16 @@ impl App {
         };
     }
 
-    fn render_bottom_bar(area: Rect, buf: &mut Buffer) {
-        let keys = [
-            ("H/←", "Left"),
-            ("L/→", "Right"),
-            ("K/↑", "Up"),
-            ("J/↓", "Down"),
-            ("D/Del", "Destroy"),
-            ("Q/Esc", "Quit"),
-        ];
-        let spans = keys
+    fn render_bottom_bar(cmd_list: Vec<(String, String)>, area: Rect, buf: &mut Buffer) {
+        // let keys = [
+        //     ("H/←", "Left"),
+        //     ("L/→", "Right"),
+        //     ("K/↑", "Up"),
+        //     ("J/↓", "Down"),
+        //     ("D/Del", "Destroy"),
+        //     ("Q/Esc", "Quit"),
+        // ];
+        let spans = cmd_list
             .iter()
             .flat_map(|(key, desc)| {
                 let key = Span::styled(format!(" {key} "), THEME.key_binding.key);
