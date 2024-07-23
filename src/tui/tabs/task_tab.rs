@@ -106,7 +106,7 @@ impl TaskTab {
     pub fn get_task(&mut self) -> String {
         let task_id = self.task_ids.get(self.row_index).unwrap().to_string();
         let mut task_json = Arc::new("".to_string());
-        let mut t_j = Arc::get_mut(&mut task_json).unwrap();
+        let t_j = Arc::get_mut(&mut task_json).unwrap();
         GLOBAL_RUNTIME.block_on(async move {
             let id = TaskId { task_id };
             let resp_task = match task_show(&id).await {

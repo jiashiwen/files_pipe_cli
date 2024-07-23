@@ -142,9 +142,17 @@ impl App {
                             return;
                         }
                         KeyCode::F(10) => {
-                            self.pop_task_editor.create_task("task_id");
+                            match self.pop_task_editor.create_task() {
+                                Ok(id) => {
+                                    self.pop_task_editor.alert_msg = format!("task {} created", id)
+                                }
+                                Err(_) => {
+                                    self.pop_task_editor.alert_msg = "create task error".to_string()
+                                }
+                            };
                             let mut editor = GLOBAL_TASK_EDITOR.write().unwrap();
                             *editor = TextArea::default();
+                            self.task_tab.refresh_data();
                             return;
                         }
                         _ => {
@@ -159,8 +167,8 @@ impl App {
                     KeyCode::Char('f') => self.task_tab.refresh_data(),
                     KeyCode::Char('a') => self.pop_task_editor.show_editor(),
                     KeyCode::Char('e') => {
-                        // let id=self.task_tab
-                        // self.pop_task_editor.show_editer_with_text()
+                        let task_str = self.task_tab.get_task();
+                        self.pop_task_editor.show_editer_with_text(vec![task_str]);
                     }
                     _ => {}
                 }

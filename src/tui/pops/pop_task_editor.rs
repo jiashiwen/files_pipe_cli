@@ -1,12 +1,17 @@
-use std::sync::{Arc, RwLock};
-
-use crate::{commons::json_to_struct, request::Task, tui::tabs::centered_rect};
+use crate::{
+    commons::json_to_struct,
+    request::{task_create, Task, GLOBAL_RUNTIME},
+    tui::tabs::centered_rect,
+};
+use anyhow::anyhow;
+use anyhow::Result;
 use once_cell::sync::Lazy;
 use ratatui::{
     layout::{Constraint, Layout},
     text::Text,
     widgets::{Clear, Widget},
 };
+use std::sync::{Arc, RwLock};
 use tui_textarea::TextArea;
 
 pub static GLOBAL_TASK_EDITOR: Lazy<Arc<RwLock<TextArea>>> = Lazy::new(|| {
@@ -31,51 +36,56 @@ impl PopTaskEditor {
         for str in text {
             for char in str.chars() {
                 text_area.insert_char(char);
-                text_area.insert_newline();
             }
+            text_area.insert_newline();
         }
     }
 
-    pub fn create_task(&mut self, task_id: &str) {
+    pub fn create_task(&mut self) -> Result<String> {
+        let mut is_error = Arc::new(false);
+        let is_error_mut = Arc::get_mut(&mut is_error).unwrap();
+        let mut task_id = Arc::new("".to_string());
+        let task_id_mut = Arc::get_mut(&mut task_id).unwrap();
+
         let mut task_json = "".to_string();
         for line in GLOBAL_TASK_EDITOR.read().unwrap().lines() {
             task_json.push_str(line);
         }
-        let task = match json_to_struct::<Task>(&task_json) {
-            Ok(t) => t,
-            Err(e) => {
-                log::error!("{:?}", e);
-                self.alert_msg = "task create err".to_string();
-                return;
-            }
-        };
 
-        log::info!("{:?}", task);
-        // GLOBAL_RUNTIME.block_on(async move {
-        //     let task = match json_to_struct::<Task>(&task_json) {
-        //         Ok(t) => t,
-        //         Err(e) => {
-        //             log::error!("{}", e);
-        //             return;
-        //         }
-        //     };
+        GLOBAL_RUNTIME.block_on(async move {
+            let task = match json_to_struct::<Task>(&task_json) {
+                Ok(t) => t,
+                Err(e) => {
+                    log::error!("{}", e);
+                    *is_error_mut = true;
+                    return;
+                }
+            };
 
-        //     let task = match task_create(&task).await {
-        //         Ok(t) => t,
-        //         Err(e) => {
-        //             log::error!("{:?}", e);
-        //             return;
-        //         }
-        //     };
+            let task = match task_create(&task).await {
+                Ok(t) => t,
+                Err(e) => {
+                    log::error!("{:?}", e);
+                    *is_error_mut = true;
+                    return;
+                }
+            };
 
-        //     let task = match task.data {
-        //         Some(t) => t,
-        //         None => {
-        //             return;
-        //         }
-        //     };
-        //     // println!("task {} created", task.task_id.as_str());
-        // });
+            let task = match task.data {
+                Some(t) => t,
+                None => {
+                    *is_error_mut = true;
+                    return;
+                }
+            };
+
+            *task_id_mut = task.task_id;
+        });
+        if *is_error {
+            return Err(anyhow!("create task error"));
+        }
+
+        Ok(task_id.to_string())
     }
 }
 
@@ -93,7 +103,7 @@ impl Widget for PopTaskEditor {
         ]);
         let [help_area, input_area, alert_area] = vertical.areas(editor_area);
         Clear.render(editor_area, buf);
-        let help = Text::from("input task json,pass 'Enter' key to add task").centered();
+        let help = Text::from("Pass F10 to add task").centered();
         help.render(help_area, buf);
         GLOBAL_TASK_EDITOR
             .read()
