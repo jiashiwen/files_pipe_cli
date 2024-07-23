@@ -2,7 +2,6 @@ use crate::{
     commons::struct_to_json_string_prettry,
     request::{list_all_tasks, task_remove, task_show, task_status, Task, TaskId, GLOBAL_RUNTIME},
 };
-use anyhow::Result;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use ratatui::{

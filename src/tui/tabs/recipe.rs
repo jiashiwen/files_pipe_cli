@@ -3,7 +3,6 @@ use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Layout, Margin, Rect},
     style::{Style, Stylize},
-    symbols,
     text::Line,
     widgets::{
         Block, Clear, Padding, Paragraph, Row, Scrollbar, ScrollbarOrientation, ScrollbarState,
@@ -14,7 +13,6 @@ use ratatui::{
 use crate::tui::{colors::RgbSwatch, THEME};
 
 // use crate::{RgbSwatch, THEME};
-
 #[derive(Debug, Default, Clone, Copy)]
 struct Ingredient {
     quantity: &'static str,

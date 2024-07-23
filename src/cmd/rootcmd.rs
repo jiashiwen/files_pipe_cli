@@ -136,7 +136,7 @@ fn cmd_match(matches: &ArgMatches) {
     }
 
     if matches.get_flag("ui") {
-        tui_start();
+        let _ = tui_start();
         return;
     }
 

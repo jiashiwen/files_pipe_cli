@@ -1,5 +1,5 @@
 use crate::{
-    request::{set_current_server, TaskServer, GLOBAL_CURRENT_SERVER, GLOBAL_RUNTIME},
+    request::{set_current_server, TaskServer, GLOBAL_CURRENT_SERVER},
     resources::{list_servers_from_cf, remove_server_from_cf},
     tui::THEME,
 };
@@ -15,7 +15,7 @@ use ratatui::{
         ScrollbarState, StatefulWidget, Table, TableState, Widget,
     },
 };
-use std::{borrow::BorrowMut, sync::Arc};
+use std::sync::Arc;
 use unicode_width::UnicodeWidthStr;
 
 // use crate::{RgbSwatch, THEME};
