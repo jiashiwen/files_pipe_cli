@@ -170,6 +170,9 @@ impl App {
                         let task_str = self.task_tab.get_task();
                         self.pop_task_editor.show_editer_with_text(vec![task_str]);
                     }
+                    KeyCode::Char('d') => {
+                        self.task_tab.delete_task();
+                    }
                     _ => {}
                 }
             }

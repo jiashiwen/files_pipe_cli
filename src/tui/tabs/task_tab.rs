@@ -1,6 +1,6 @@
 use crate::{
     commons::struct_to_json_string_prettry,
-    request::{list_all_tasks, task_show, task_status, Task, TaskId, GLOBAL_RUNTIME},
+    request::{list_all_tasks, task_remove, task_show, task_status, Task, TaskId, GLOBAL_RUNTIME},
 };
 use anyhow::Result;
 use dashmap::DashMap;
@@ -75,7 +75,6 @@ pub struct TaskTab {
     colors: TableColors,
     color_index: usize,
     longest_item_lens: (u16, u16, u16, u16),
-    // task_editor: PopTaskEditor<'a>,
 }
 
 impl TaskTab {
@@ -135,6 +134,24 @@ impl TaskTab {
             t_j.push_str(&task_json);
         });
         task_json.to_string()
+    }
+
+    pub fn delete_task(&mut self) {
+        match self.task_ids.get(self.row_index) {
+            Some(t) => {
+                GLOBAL_RUNTIME.block_on(async move {
+                    let _ = match task_remove(&TaskId { task_id: t.clone() }).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!("{:?}", e);
+                            return;
+                        }
+                    };
+                });
+            }
+            None => {}
+        };
+        self.refresh_data();
     }
 
     pub fn refresh_data(&mut self) {

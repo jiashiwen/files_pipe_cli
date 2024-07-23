@@ -173,7 +173,7 @@ impl Widget for ServerTab {
         self.set_colors();
         // RgbSwatch.render(area, buf);
         let area = area.inner(Margin {
-            vertical: 2,
+            vertical: 1,
             horizontal: 2,
         });
         Clear.render(area, buf);
@@ -189,12 +189,13 @@ impl Widget for ServerTab {
 
         let scrollbar_area = Rect {
             y: area.y + 2,
-            height: area.height - 3,
+            height: area.height - 2,
             ..area
         };
+
         let table_area = Rect {
             y: area.y + 2,
-            height: area.height - 3,
+            height: area.height - 2,
             ..area
         };
         render_scrollbar(self.row_index, scrollbar_area, buf);
@@ -237,7 +238,8 @@ fn render_server_table(server_tab: &ServerTab, area: Rect, buf: &mut Buffer) {
             .map(|content| Cell::from(Text::from(format!("\n{content}\n"))))
             .collect::<Row>()
             .style(Style::new().fg(server_tab.colors.row_fg).bg(color))
-            .height(4)
+            .height(3)
+        // .height(4)
     });
     let bar = " █ ";
 
@@ -255,7 +257,7 @@ fn render_server_table(server_tab: &ServerTab, area: Rect, buf: &mut Buffer) {
     .highlight_symbol(Text::from(vec![
         "".into(),
         bar.into(),
-        bar.into(),
+        // bar.into(),
         "".into(),
     ]))
     .bg(server_tab.colors.buffer_bg)
