@@ -14,7 +14,6 @@ use ratatui::{
     terminal::Terminal,
     text::{Line, Span},
     widgets::{Block, Tabs, Widget},
-    Frame,
 };
 use std::time::Duration;
 use strum::{Display, EnumCount, EnumIter, FromRepr, IntoEnumIterator};
@@ -47,11 +46,11 @@ enum Mode {
 enum Tab {
     #[default]
     About,
-    ServerTab,
-    TaskTab, // Recipe,
-             // Email,
-             // Traceroute,
-             // Weather,
+    Server,
+    Task, // Recipe,
+          // Email,
+          // Traceroute,
+          // Weather,
 }
 
 pub fn run(terminal: &mut Terminal<impl Backend>) -> Result<()> {
@@ -105,7 +104,7 @@ impl App {
                 KeyCode::Char('d') | KeyCode::Delete => self.destroy(),
                 _ => {}
             },
-            Tab::ServerTab => {
+            Tab::Server => {
                 self.server_tab.refresh_data();
                 if self.pop_new_server.show {
                     match key.code {
@@ -132,7 +131,7 @@ impl App {
                 }
             }
 
-            Tab::TaskTab => {
+            Tab::Task => {
                 if self.pop_task_editor.show {
                     match key.code {
                         KeyCode::Esc => {
@@ -240,7 +239,7 @@ impl Widget for &App {
                 ("D/Del".to_string(), "Destroy".to_string()),
                 ("Q/Esc".to_string(), "Quit".to_string()),
             ],
-            Tab::ServerTab => {
+            Tab::Server => {
                 vec![
                     ("TAB".to_string(), "SelectTab".to_string()),
                     ("K/↑".to_string(), "Up".to_string()),
@@ -251,7 +250,7 @@ impl Widget for &App {
                     ("Q/Esc".to_string(), "Quit".to_string()),
                 ]
             }
-            Tab::TaskTab => vec![
+            Tab::Task => vec![
                 ("TAB".to_string(), "SelectTab".to_string()),
                 ("K/↑".to_string(), "Up".to_string()),
                 ("J/↓".to_string(), "Down".to_string()),
@@ -296,11 +295,11 @@ impl App {
     fn render_selected_tab(self, area: Rect, buf: &mut Buffer) {
         match self.tab {
             Tab::About => self.about_tab.render(area, buf),
-            Tab::ServerTab => {
+            Tab::Server => {
                 let tab = self.server_tab.clone();
                 tab.render(area, buf);
             }
-            Tab::TaskTab => {
+            Tab::Task => {
                 let tab = self.task_tab.clone();
                 tab.render(area, buf)
             }
