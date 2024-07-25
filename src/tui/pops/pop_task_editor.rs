@@ -14,6 +14,8 @@ use ratatui::{
 use std::sync::{Arc, RwLock};
 use tui_textarea::TextArea;
 
+use super::PopSelectTemplate;
+
 pub static GLOBAL_TASK_EDITOR: Lazy<Arc<RwLock<TextArea>>> = Lazy::new(|| {
     let task_editor = Arc::new(RwLock::new(TextArea::default()));
     task_editor
@@ -23,6 +25,7 @@ pub static GLOBAL_TASK_EDITOR: Lazy<Arc<RwLock<TextArea>>> = Lazy::new(|| {
 pub struct PopTaskEditor {
     pub show: bool,
     pub alert_msg: String,
+    pub pop_select_template: PopSelectTemplate,
 }
 
 impl PopTaskEditor {

@@ -133,11 +133,30 @@ impl App {
 
             Tab::Task => {
                 if self.pop_task_editor.show {
+                    if self.pop_task_editor.pop_select_template.show {
+                        match key.code {
+                            KeyCode::Esc => {
+                                self.pop_task_editor.pop_select_template.show = false;
+                                return;
+                            }
+                            KeyCode::Char('j') | KeyCode::Down => {
+                                self.pop_task_editor.pop_select_template.select_template()
+                            }
+                            _ => {
+                                return;
+                            }
+                        }
+                    }
                     match key.code {
                         KeyCode::Esc => {
                             self.pop_task_editor.show = false;
                             let mut editor = GLOBAL_TASK_EDITOR.write().unwrap();
                             *editor = TextArea::default();
+                            return;
+                        }
+
+                        KeyCode::F(9) => {
+                            self.pop_task_editor.pop_select_template.show_pop();
                             return;
                         }
                         KeyCode::F(10) => {
@@ -195,7 +214,6 @@ impl App {
     fn next(&mut self) {
         match self.tab {
             Tab::About => self.about_tab.next_row(),
-
             _ => {}
         }
     }
@@ -268,6 +286,13 @@ impl Widget for &App {
 
         if self.pop_task_editor.show {
             self.pop_task_editor.clone().render(area, buf);
+        }
+
+        if self.pop_task_editor.pop_select_template.show {
+            self.pop_task_editor
+                .pop_select_template
+                .clone()
+                .render(area, buf)
         }
 
         if self.pop_new_server.show {

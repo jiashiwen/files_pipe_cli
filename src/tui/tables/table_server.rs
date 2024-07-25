@@ -269,54 +269,6 @@ fn generate_fake_names() -> Vec<Data> {
         .collect_vec()
 }
 
-// fn main() -> Result<(), Box<dyn Error>> {
-//     // setup terminal
-//     enable_raw_mode()?;
-//     let mut stdout = io::stdout();
-//     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-//     let backend = CrosstermBackend::new(stdout);
-//     let mut terminal = Terminal::new(backend)?;
-
-//     // create app and run it
-//     let app = App::new();
-//     let res = run_app(&mut terminal, app);
-
-//     // restore terminal
-//     disable_raw_mode()?;
-//     execute!(
-//         terminal.backend_mut(),
-//         LeaveAlternateScreen,
-//         DisableMouseCapture
-//     )?;
-//     terminal.show_cursor()?;
-
-//     if let Err(err) = res {
-//         println!("{err:?}");
-//     }
-
-//     Ok(())
-// }
-
-// fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
-//     loop {
-//         terminal.draw(|f| ui_table_server(f, &mut app))?;
-
-//         if let Event::Key(key) = event::read()? {
-//             if key.kind == KeyEventKind::Press {
-//                 use KeyCode::*;
-//                 match key.code {
-//                     Char('q') | Esc => return Ok(()),
-//                     Char('j') | Down => app.next(),
-//                     Char('k') | Up => app.previous(),
-//                     Char('l') | Right => app.next_color(),
-//                     Char('h') | Left => app.previous_color(),
-//                     _ => {}
-//                 }
-//             }
-//         }
-//     }
-// }
-
 pub fn ui_table_server(f: &mut Frame, app: &mut TableServer) {
     let rects = Layout::vertical([Constraint::Min(5), Constraint::Length(3)]).split(f.size());
 
@@ -375,7 +327,6 @@ pub fn render_table(f: &mut Frame, app: &mut TableServer, area: Rect) {
     ]))
     .bg(app.colors.buffer_bg)
     .highlight_spacing(HighlightSpacing::Always);
-    // f.render_stateful_widget(t, area, &mut app.state);
 }
 
 fn constraint_len_calculator(items: &[Data]) -> (u16, u16, u16) {
