@@ -137,10 +137,28 @@ impl App {
                         match key.code {
                             KeyCode::Esc => {
                                 self.pop_task_editor.pop_select_template.show = false;
+                                self.pop_task_editor.pop_select_template.clean();
+                                return;
+                            }
+                            KeyCode::Char('k') | KeyCode::Up => {
+                                self.pop_task_editor.pop_select_template.prev();
                                 return;
                             }
                             KeyCode::Char('j') | KeyCode::Down => {
-                                self.pop_task_editor.pop_select_template.select_template()
+                                self.pop_task_editor.pop_select_template.next();
+                                return;
+                            }
+                            KeyCode::Enter => {
+                                self.pop_task_editor.pop_select_template.load_template();
+                                self.pop_task_editor.show_editer_with_text(vec![self
+                                    .pop_task_editor
+                                    .pop_select_template
+                                    .template
+                                    .clone()]);
+                                self.pop_task_editor.pop_select_template.clean();
+                                self.pop_task_editor.pop_select_template.show = false;
+
+                                return;
                             }
                             _ => {
                                 return;
@@ -332,14 +350,6 @@ impl App {
     }
 
     fn render_bottom_bar(cmd_list: Vec<(String, String)>, area: Rect, buf: &mut Buffer) {
-        // let keys = [
-        //     ("H/←", "Left"),
-        //     ("L/→", "Right"),
-        //     ("K/↑", "Up"),
-        //     ("J/↓", "Down"),
-        //     ("D/Del", "Destroy"),
-        //     ("Q/Esc", "Quit"),
-        // ];
         let spans = cmd_list
             .iter()
             .flat_map(|(key, desc)| {

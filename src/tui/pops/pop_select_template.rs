@@ -1,9 +1,12 @@
-use crate::{request::TaskServer, resources::save_task_server_to_cf, tui::tabs::centered_rect};
-use color_eyre::owo_colors::colors::Black;
-use color_eyre::owo_colors::OwoColorize;
-use itertools::Itertools;
-use ratatui::style::{Color, Style, Styled, Stylize};
-use ratatui::text::Text;
+use std::sync::Arc;
+
+use crate::commons::struct_to_json_string_prettry;
+use crate::request::{
+    template_transfer_local2local, template_transfer_local2oss, template_transfer_oss2local,
+    template_transfer_oss2oss, GLOBAL_RUNTIME,
+};
+use crate::tui::tabs::centered_rect;
+use ratatui::style::{Color, Style, Stylize};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui::{
     layout::{Constraint, Layout},
@@ -25,6 +28,12 @@ pub enum TrasnferTemplate {
 }
 
 impl TrasnferTemplate {
+    fn prev(self) -> Self {
+        let current_index = self as usize;
+        let prev_index = current_index.saturating_sub(1);
+        Self::from_repr(prev_index).unwrap_or(self)
+    }
+
     fn next(self) -> Self {
         let current_index = self as usize;
         let mut next_index = current_index.saturating_add(1);
@@ -55,8 +64,55 @@ impl PopSelectTemplate {
         self.show = !self.show
     }
 
-    pub fn select_template(&mut self) {
+    pub fn clean(&mut self) {
+        self.selected_template = TrasnferTemplate::default();
+        self.template = String::default();
+    }
+
+    pub fn prev(&mut self) {
+        self.selected_template = self.selected_template.prev();
+    }
+
+    pub fn next(&mut self) {
         self.selected_template = self.selected_template.next();
+    }
+
+    pub fn load_template(&mut self) {
+        let template_type = self.selected_template.clone();
+        let mut template_str = Arc::new("".to_string());
+        let template_str_mut = Arc::get_mut(&mut template_str).unwrap();
+        GLOBAL_RUNTIME.block_on(async move {
+            let resp_task = match template_type {
+                TrasnferTemplate::Oss2Oss => template_transfer_oss2oss().await,
+                TrasnferTemplate::Oss2Local => template_transfer_oss2local().await,
+                TrasnferTemplate::Local2Oss => template_transfer_local2oss().await,
+                TrasnferTemplate::Local2Local => template_transfer_local2local().await,
+            };
+            let task = match resp_task {
+                Ok(t) => t,
+                Err(e) => {
+                    log::error!("{:?}", e);
+                    return;
+                }
+            };
+
+            let task = match task.data {
+                Some(t) => t,
+                None => {
+                    return;
+                }
+            };
+            let task_json = match struct_to_json_string_prettry(&task) {
+                Ok(j) => j,
+                Err(e) => {
+                    log::error!("{:?}", e);
+                    return;
+                }
+            };
+            *template_str_mut = task_json
+        });
+
+        self.template = template_str.to_string();
     }
 }
 
@@ -65,7 +121,7 @@ impl Widget for PopSelectTemplate {
     where
         Self: Sized,
     {
-        let template_area = centered_rect(50, 60, area);
+        let template_area = centered_rect(30, 30, area);
         let vertical = Layout::vertical([
             Constraint::Percentage(25),
             Constraint::Percentage(25),
@@ -73,8 +129,6 @@ impl Widget for PopSelectTemplate {
             Constraint::Percentage(25),
         ])
         .split(template_area);
-        // let [oss2oss_area, oss2local_area, local2oss_area, local2local_area] =
-        // vertical.areas(template_area);
 
         Clear.render(template_area, buf);
 
@@ -92,40 +146,6 @@ impl Widget for PopSelectTemplate {
             };
             paragraph.block(block).render(vertical[i], buf)
         }
-
-        // let oss2oss = Paragraph::new("oss2oss".dark_gray()).wrap(Wrap { trim: true });
-
-        // let mut oss2oss_block = Block::default()
-        //     .borders(Borders::ALL)
-        //     .style(Style::default());
-        // let mut oss2local_block = Block::default()
-        //     .borders(Borders::ALL)
-        //     .style(Style::default());
-        // let mut local2oss_block = Block::default()
-        //     .borders(Borders::ALL)
-        //     .style(Style::default());
-        // let mut local2local_block = Block::default()
-        //     .borders(Borders::ALL)
-        //     .style(Style::default());
-
-        // match self.selected_template {
-        //     TrasnferTemplate::Oss2Oss => {
-        //         oss2oss_block = oss2oss_block.set_style(Style::default().bg(Color::Blue))
-        //     }
-        //     TrasnferTemplate::Oss2Local => {
-        //         oss2local_block = oss2local_block.set_style(Style::default().bg(Color::Blue))
-        //     }
-        //     TrasnferTemplate::Local2Oss => {
-        //         local2oss_block = local2oss_block.set_style(Style::default().bg(Color::Blue))
-        //     }
-        //     TrasnferTemplate::Local2Local => {
-        //         local2local_block = local2local_block.set_style(Style::default().bg(Color::Blue))
-        //     }
-        // };
-        // oss2oss_block.render(oss2oss_area, buf);
-        // oss2local_block.render(oss2local_area, buf);
-        // local2oss_block.render(local2oss_area, buf);
-        // local2local_block.render(local2local_area, buf);
     }
 }
 

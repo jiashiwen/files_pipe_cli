@@ -34,7 +34,7 @@ impl PopTaskEditor {
     }
 
     pub fn show_editer_with_text(&mut self, text: Vec<String>) {
-        self.show = !self.show;
+        self.show = true;
         let mut text_area = GLOBAL_TASK_EDITOR.write().unwrap();
         for str in text {
             for char in str.chars() {
