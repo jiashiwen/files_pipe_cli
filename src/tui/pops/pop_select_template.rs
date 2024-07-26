@@ -148,10 +148,3 @@ impl Widget for PopSelectTemplate {
         }
     }
 }
-
-// #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, EnumIter, FromRepr, EnumCount)]
-// pub enum SelectedInput {
-//     #[default]
-//     Name,
-//     Url,
-// }

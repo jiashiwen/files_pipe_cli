@@ -1,6 +1,10 @@
 use crate::{
-    commons::struct_to_json_string_prettry,
-    request::{list_all_tasks, task_remove, task_show, task_status, Task, TaskId, GLOBAL_RUNTIME},
+    commons::{struct_to_json_string, struct_to_json_string_prettry},
+    request::{
+        list_all_tasks, task_remove, task_show, task_start, task_status, task_stop, Task, TaskId,
+        GLOBAL_RUNTIME,
+    },
+    tui::pops::PopAlert,
 };
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
@@ -55,7 +59,7 @@ impl TableColors {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-struct TaskRow {
+pub struct TaskRow {
     id: String,
     name: String,
     task_type: String,
@@ -74,9 +78,14 @@ pub struct TaskTab {
     colors: TableColors,
     color_index: usize,
     longest_item_lens: (u16, u16, u16, u16),
+    pub pop_alert: PopAlert,
 }
 
 impl TaskTab {
+    fn alert(&mut self, msg: &str) {
+        self.pop_alert.set_alert_msg(msg);
+        self.pop_alert.alert_switch()
+    }
     /// Select the previous item in the ingredients list (with wrap around)
     pub fn prev(&mut self) {
         match GLOBAL_TASKS_LIST.len().eq(&0) {
@@ -100,7 +109,6 @@ impl TaskTab {
         self.colors = TableColors::new(&PALETTES[self.color_index]);
     }
 
-    // Todo 设置事件，进行测试
     pub fn get_task(&mut self) -> String {
         let task_id = self.task_ids.get(self.row_index).unwrap().to_string();
         let mut task_json = Arc::new("".to_string());
@@ -133,6 +141,69 @@ impl TaskTab {
             t_j.push_str(&task_json);
         });
         task_json.to_string()
+    }
+
+    pub fn run_task(&mut self) {
+        let task_id = self.task_ids.get(self.row_index).unwrap().to_string();
+        let mut exec_err = Arc::new(None);
+        let e_e = Arc::get_mut(&mut exec_err).unwrap();
+        GLOBAL_RUNTIME.block_on(async move {
+            let req_id = TaskId { task_id };
+            let resp = match task_start(&req_id).await {
+                Ok(t) => t,
+                Err(e) => {
+                    *e_e = Some(e.to_string());
+                    log::error!("{:?}", e);
+                    return;
+                }
+            };
+
+            if !resp.code.eq(&0) {
+                let resp_str = struct_to_json_string(&resp).unwrap();
+                *e_e = Some(resp_str);
+            }
+        });
+        match exec_err.as_deref() {
+            Some(s) => {
+                self.pop_alert.set_alert_msg(s);
+                self.pop_alert.show;
+            }
+            None => {
+                self.refresh_data();
+            }
+        }
+    }
+
+    pub fn stop_task(&mut self) {
+        let task_id = self.task_ids.get(self.row_index).unwrap().to_string();
+        let mut exec_err = Arc::new(None);
+        let e_e = Arc::get_mut(&mut exec_err).unwrap();
+        GLOBAL_RUNTIME.block_on(async move {
+            let req_id = TaskId { task_id };
+            let resp = match task_stop(&req_id).await {
+                Ok(t) => t,
+                Err(e) => {
+                    *e_e = Some(e.to_string());
+                    log::error!("{:?}", e);
+                    return;
+                }
+            };
+            log::info!("{:?}", resp);
+
+            if !resp.code.eq(&0) {
+                let resp_str = struct_to_json_string(&resp).unwrap();
+                *e_e = Some(resp_str);
+            }
+        });
+        match exec_err.as_deref() {
+            Some(s) => {
+                self.pop_alert.set_alert_msg(s);
+                self.pop_alert.show;
+            }
+            None => {
+                self.refresh_data();
+            }
+        }
     }
 
     pub fn delete_task(&mut self) {
@@ -247,6 +318,7 @@ impl Widget for TaskTab {
         };
         render_scrollbar(self.row_index, scrollbar_area, buf);
         render_task_table(&self, area, buf);
+        self.pop_alert.render(area, buf)
     }
 }
 

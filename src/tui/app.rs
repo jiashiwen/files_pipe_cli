@@ -1,3 +1,5 @@
+use crate::request::GLOBAL_RUNTIME;
+
 use super::{
     pops::{PopNewServer, PopTaskEditor, GLOBAL_TASK_EDITOR},
     tabs::{AboutTab, EmailTab, RecipeTab, ServerTab, TaskTab, TracerouteTab, WeatherTab},
@@ -132,6 +134,16 @@ impl App {
             }
 
             Tab::Task => {
+                if self.task_tab.pop_alert.show {
+                    match key.code {
+                        KeyCode::Esc => {
+                            self.task_tab.pop_alert.show = false;
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+
                 if self.pop_task_editor.show {
                     if self.pop_task_editor.pop_select_template.show {
                         match key.code {
@@ -209,10 +221,20 @@ impl App {
                     KeyCode::Char('d') => {
                         self.task_tab.delete_task();
                     }
+                    KeyCode::Char('r') => {
+                        self.task_tab.run_task();
+                    }
+                    KeyCode::Char('i') => {
+                        self.task_tab.stop_task();
+                    }
+                    // test alert
+                    KeyCode::F(2) => {
+                        self.task_tab.pop_alert.set_alert_msg("msg");
+                        self.task_tab.pop_alert.alert_switch();
+                    }
                     _ => {}
                 }
             }
-            _ => {}
         };
 
         match key.code {

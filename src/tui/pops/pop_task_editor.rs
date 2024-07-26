@@ -106,7 +106,7 @@ impl Widget for PopTaskEditor {
         ]);
         let [help_area, input_area, alert_area] = vertical.areas(editor_area);
         Clear.render(editor_area, buf);
-        let help = Text::from("Pass F10 to add task").centered();
+        let help = Text::from("Pass F9 to use template F10 to save task").centered();
         help.render(help_area, buf);
         GLOBAL_TASK_EDITOR
             .read()
