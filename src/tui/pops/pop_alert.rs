@@ -1,4 +1,5 @@
 use ratatui::prelude::*;
+use ratatui::widgets::Clear;
 use ratatui::{
     style::Style,
     symbols,
@@ -35,12 +36,13 @@ impl Widget for PopAlert {
 }
 
 fn render_pop_alert(pop_alert: &PopAlert, area: Rect, buf: &mut Buffer) {
-    let template_area = centered_rect(30, 30, area);
+    let alert_area = centered_rect(30, 30, area);
+    Clear.render(alert_area, buf);
     let block = Block::bordered()
         .border_set(symbols::border::DOUBLE)
         .style(Style::new().green());
     let paragraph = Paragraph::new(pop_alert.alert_msg.to_string())
         .centered()
         .block(block);
-    paragraph.render(template_area, buf)
+    paragraph.render(alert_area, buf)
 }

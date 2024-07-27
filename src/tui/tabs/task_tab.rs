@@ -166,7 +166,7 @@ impl TaskTab {
         match exec_err.as_deref() {
             Some(s) => {
                 self.pop_alert.set_alert_msg(s);
-                self.pop_alert.show;
+                self.pop_alert.alert_switch();
             }
             None => {
                 self.refresh_data();
@@ -198,7 +198,7 @@ impl TaskTab {
         match exec_err.as_deref() {
             Some(s) => {
                 self.pop_alert.set_alert_msg(s);
-                self.pop_alert.show;
+                self.pop_alert.alert_switch();
             }
             None => {
                 self.refresh_data();

@@ -1,8 +1,6 @@
-use crate::request::GLOBAL_RUNTIME;
-
 use super::{
-    pops::{PopNewServer, PopTaskEditor, GLOBAL_TASK_EDITOR},
-    tabs::{AboutTab, EmailTab, RecipeTab, ServerTab, TaskTab, TracerouteTab, WeatherTab},
+    pops::{PopHelp, PopNewServer, PopTaskEditor, GLOBAL_TASK_EDITOR},
+    tabs::{AboutTab, ServerTab, TaskTab},
     term, THEME,
 };
 use color_eyre::{eyre::Context, Result};
@@ -28,10 +26,7 @@ pub struct App {
     about_tab: AboutTab,
     server_tab: ServerTab,
     task_tab: TaskTab,
-    recipe_tab: RecipeTab,
-    email_tab: EmailTab,
-    traceroute_tab: TracerouteTab,
-    weather_tab: WeatherTab,
+    pop_help: PopHelp,
     pop_task_editor: PopTaskEditor,
     pop_new_server: PopNewServer,
 }
@@ -99,6 +94,17 @@ impl App {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) {
+        if self.pop_help.show {
+            match key.code {
+                KeyCode::Esc => {
+                    self.pop_help.show = false;
+                }
+                KeyCode::Char('k') | KeyCode::Up => self.pop_help.prev_line(),
+                KeyCode::Char('j') | KeyCode::Down => self.pop_help.next_line(),
+                _ => {}
+            }
+            return;
+        }
         match self.tab {
             Tab::About => match key.code {
                 KeyCode::Char('k') | KeyCode::Up => self.prev(),
@@ -140,7 +146,9 @@ impl App {
                             self.task_tab.pop_alert.show = false;
                             return;
                         }
-                        _ => {}
+                        _ => {
+                            return;
+                        }
                     }
                 }
 
@@ -213,7 +221,7 @@ impl App {
                     KeyCode::Char('k') | KeyCode::Up => self.task_tab.prev(),
                     KeyCode::Char('j') | KeyCode::Down => self.task_tab.next(),
                     KeyCode::Char('f') => self.task_tab.refresh_data(),
-                    KeyCode::Char('a') => self.pop_task_editor.show_editor(),
+                    KeyCode::Char('c') => self.pop_task_editor.show_editor(),
                     KeyCode::Char('e') => {
                         let task_str = self.task_tab.get_task();
                         self.pop_task_editor.show_editer_with_text(vec![task_str]);
@@ -227,19 +235,15 @@ impl App {
                     KeyCode::Char('i') => {
                         self.task_tab.stop_task();
                     }
-                    // test alert
-                    KeyCode::F(2) => {
-                        self.task_tab.pop_alert.set_alert_msg("msg");
-                        self.task_tab.pop_alert.alert_switch();
-                    }
                     _ => {}
                 }
             }
         };
 
         match key.code {
-            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
             KeyCode::Tab => self.next_tab(),
+            KeyCode::F(1) => self.pop_help.show_switch(),
+            KeyCode::Char('q') | KeyCode::Esc => self.mode = Mode::Quit,
             _ => {}
         };
     }
@@ -323,6 +327,8 @@ impl Widget for &App {
         };
 
         App::render_bottom_bar(keys, bottom_bar, buf);
+
+        self.pop_help.render(area, buf);
 
         if self.pop_task_editor.show {
             self.pop_task_editor.clone().render(area, buf);
