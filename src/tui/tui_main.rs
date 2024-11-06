@@ -19,15 +19,6 @@
     clippy::must_use_candidate
 )]
 
-// mod app;
-// mod big_text;
-// mod colors;
-// mod destroy;
-// mod errors;
-// mod tabs;
-// mod term;
-// mod theme;
-
 use color_eyre::Result;
 
 pub use super::theme::THEME;
